@@ -51,7 +51,14 @@ log_tpm <- log_tpm[, c("Gene.Name", setdiff(names(log_tpm), "Gene.Name"))]
 # Removing unmapped genes bnumber
 log_tpm <- subset(log_tpm, !is.na(Gene.Name))
 
+log_tpm_mean <- apply(log_tpm[,3:ncol(log_tpm)], 1, mean)
+hist(log_tpm_mean, breaks = 50)
 
+log_tpm_median <- apply(log_tpm[,3:ncol(log_tpm)], 1, median)
+hist(log_tpm_median, breaks = 50)
+
+log_tpm_max <- apply(log_tpm[,3:ncol(log_tpm)], 1, max)
+hist(log_tpm_max, breaks = 50)
 
 # In this project, we want to introduce a proxy for a transcription factor activity based on the expression level of genes
 # regulated by that transcription factor.
