@@ -1,6 +1,9 @@
 library(readr)
 library(matrixStats)
 library(dplyr)
+library(ggplot2)
+library(grid)
+library(gridExtra)
 
 # Import file 
 log_tpm <- read.csv("log_tpm_full.csv", row.names = 1)
@@ -51,18 +54,117 @@ log_tpm <- log_tpm[, c("Gene.Name", setdiff(names(log_tpm), "Gene.Name"))]
 # Removing unmapped genes bnumber
 log_tpm <- subset(log_tpm, !is.na(Gene.Name))
 
-log_tpm_mean <- apply(log_tpm[,3:ncol(log_tpm)], 1, mean)
-hist(log_tpm_mean, breaks = 50)
+# Histograms of Summary Statistics
+log_tpm_mean <- data.frame(value = apply(log_tpm[,3:ncol(log_tpm)], 1, mean))
+mean_hist <- ggplot(log_tpm_mean, aes(x = value)) +
+             geom_histogram(binwidth = 0.5, fill = "skyblue", 
+                           color = "black", bins = 100) +
+             labs(x = "Mean log-TPM", y = "Frequency") +
+             theme_minimal() +
+             theme(panel.grid.major = element_blank(), 
+                   panel.grid.minor = element_blank())
+shapiro.test(log_tpm_mean$value) #not gaussian
 
-log_tpm_median <- apply(log_tpm[,3:ncol(log_tpm)], 1, median)
-hist(log_tpm_median, breaks = 50)
+log_tpm_median <- data.frame(value = apply(log_tpm[,3:ncol(log_tpm)], 1, median))
+median_hist <- ggplot(log_tpm_median, aes(x = value)) +
+               geom_histogram(binwidth = 0.5, fill = "lightgreen", 
+                              color = "black", bins = 100) +
+               labs(x = "Median log-TPM", y = "Frequency") +
+               theme_minimal() +
+               theme(panel.grid.major = element_blank(), 
+                     panel.grid.minor = element_blank())
+shapiro.test(log_tpm_median$value) #not gaussian
 
-log_tpm_max <- apply(log_tpm[,3:ncol(log_tpm)], 1, max)
-hist(log_tpm_max, breaks = 50)
+log_tpm_max <- data.frame(value = apply(log_tpm[,3:ncol(log_tpm)], 1, max))
+max_hist <- ggplot(log_tpm_max, aes(x = value)) +
+               geom_histogram(binwidth = 0.5, fill = "lavender", 
+                              color = "black", bins = 100) +
+               labs(x = "Max log-TPM", y = "Frequency") +
+               theme_minimal() +
+               theme(panel.grid.major = element_blank(), 
+                     panel.grid.minor = element_blank())
+shapiro.test(log_tpm_max$value) #not gaussian
 
-# In this project, we want to introduce a proxy for a transcription factor activity based on the expression level of genes
-# regulated by that transcription factor.
+log_tpm_min <- data.frame(value = apply(log_tpm[,3:ncol(log_tpm)], 1, min))
+min_hist <- ggplot(log_tpm_min, aes(x = value)) +
+            geom_histogram(binwidth = 0.5, fill = "lightpink", 
+                           color = "black", bins = 100) +
+            labs(x = "Min log-TPM", y = "Frequency") +
+            theme_minimal() +
+            theme(panel.grid.major = element_blank(), 
+                  panel.grid.minor = element_blank())
+shapiro.test(log_tpm_min$value) #not gaussian
 
-# For a positive regulator, its activity can be taken as being a function (linear? sigmoidal?) of
-# the expression level of its targets (mean? median? max?).
-# Unsupervised learning features = expr level, outcome activity 
+grid.arrange(mean_hist, median_hist, max_hist, min_hist, nrow = 2, ncol = 2,
+             top = textGrob("Histograms of Summary Statistics", 
+                            gp=gpar(fontsize=16)))
+
+# Histogram of how many genes are regulated by each gene
+positive_reg <- regulator[regulator$X6.function == "+",]
+negative_reg <- regulator[regulator$X6.function == "-",]
+unique_regulators <- unique(regulator$X3.RegulatorGeneName)
+
+pos_counts <- c()
+neg_counts <- c()
+
+for(reg in unique_regulators){
+  pos_counts <- c(pos_counts, 
+                  count(positive_reg[positive_reg$X3.RegulatorGeneName == reg,]))
+  neg_counts <- c(neg_counts, 
+                  count(negative_reg[negative_reg$X3.RegulatorGeneName == reg,]))
+}
+
+pos_counts <- unlist(pos_counts)
+names(pos_counts) <- unique_regulators
+
+neg_counts <- unlist(neg_counts)
+names(neg_counts) <- unique_regulators
+
+pos_counts <- data.frame(value = pos_counts)
+shapiro.test(pos_counts$value) #not gaussian
+
+neg_counts <- data.frame(value = neg_counts)
+shapiro.test(neg_counts$value) #not gaussian
+
+total_counts <- data.frame(value = pos_counts$value + neg_counts$value)
+shapiro.test(total_counts$value) #not gaussian
+
+pos_counts_hist <- ggplot(pos_counts, aes(x = value)) +
+                   geom_histogram(binwidth = 10, fill = "skyblue", 
+                                  color = "black", bins = 20) +
+                   labs(x = "Positive Regulations Count", y = "Frequency") +
+                   theme_minimal() +
+                   theme(panel.grid.major = element_blank(), 
+                        panel.grid.minor = element_blank())
+
+neg_counts_hist <- ggplot(neg_counts, aes(x = value)) +
+                   geom_histogram(binwidth = 10, fill = "lightgreen", 
+                                  color = "black", bins = 20) +
+                   labs(x = "Negative Regulations Count", y = "Frequency") +
+                   theme_minimal() +
+                   theme(panel.grid.major = element_blank(), 
+                         panel.grid.minor = element_blank())
+
+total_counts_hist <- ggplot(total_counts, aes(x = value)) +
+                   geom_histogram(binwidth = 10, fill = "lightpink", 
+                                  color = "black", bins = 20) +
+                   labs(x = "Total Regulations Count", y = "Frequency") +
+                   theme_minimal() +
+                   theme(panel.grid.major = element_blank(), 
+                         panel.grid.minor = element_blank())
+
+grid.arrange(pos_counts_hist, neg_counts_hist, total_counts_hist, nrow = 1)
+
+# crp positively controls 310 genes, lets do a subset
+crp_target <- positive_reg[positive_reg$X3.RegulatorGeneName == "crp",]
+crp_target_exp <- log_tpm[log_tpm$Gene.Name %in% crp_target$X5.regulatedName,]
+crp_target_exp$mean_exp <- apply(crp_target_exp[,3:ncol(crp_target_exp)], 1, mean)
+
+# caccapupu <- apply(crp_target_exp[,3:(ncol(crp_target_exp)-1)], 2, mean)
+# plot(caccapupu, log_tpm[log_tpm$Gene.Name == "crp", 3:ncol(log_tpm)])
+
+# Scaling with RobustScaler
+# log_tpm_norm <- log_tpm
+# log_tpm_norm[,3:ncol(log_tpm_norm)] <- 
+#   apply(log_tpm_norm[,3:ncol(log_tpm_norm)], 1, 
+#         function(x){(x-median(x))/IQR(x)})
