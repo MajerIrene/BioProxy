@@ -1,6 +1,8 @@
 library(readr)
 library(matrixStats)
 library(dplyr)
+library(igraph)
+
 
 # Import file 
 log_tpm <- read.csv("log_tpm_full.csv", row.names = 1)
@@ -60,9 +62,8 @@ hist(log_tpm_median, breaks = 50)
 log_tpm_max <- apply(log_tpm[,3:ncol(log_tpm)], 1, max)
 hist(log_tpm_max, breaks = 50)
 
-# In this project, we want to introduce a proxy for a transcription factor activity based on the expression level of genes
-# regulated by that transcription factor.
+# Creating adj matrix to plot the network
+edge_list <- cbind(RagulatorName = regulator$X3.RegulatorGeneName, Target = regulator$X5.regulatedName)
+graph <- graph_from_edgelist(edge_list)
+plot_grn(edge_list)
 
-# For a positive regulator, its activity can be taken as being a function (linear? sigmoidal?) of
-# the expression level of its targets (mean? median? max?).
-# Unsupervised learning features = expr level, outcome activity 
