@@ -55,8 +55,18 @@ log_tpm <- log_tpm[, c("Gene.Name", setdiff(names(log_tpm), "Gene.Name"))]
 # Removing unmapped genes bnumber
 log_tpm <- subset(log_tpm, !is.na(Gene.Name))
 
+#removing duplicate genes (it also has all expression values equal 0 so very bad)
+log_tpm <- subset(log_tpm, !(log_tpm$Gene.Name == "insI2"))
+
+#setting rownames and dropping the first 2 columns
+rownames(log_tpm) <- log_tpm$Gene.Name
+log_tpm <- log_tpm[,3:ncol(log_tpm)]
+
+#transpose log_tpm
+log_tpm <- t(log_tpm)
+
 # Histograms of Summary Statistics
-log_tpm_mean <- data.frame(value = apply(log_tpm[,3:ncol(log_tpm)], 1, mean))
+log_tpm_mean <- data.frame(value = apply(log_tpm, 2, mean))
 mean_hist <- ggplot(log_tpm_mean, aes(x = value)) +
              geom_histogram(binwidth = 0.5, fill = "skyblue", 
                            color = "black", bins = 100) +
@@ -66,7 +76,7 @@ mean_hist <- ggplot(log_tpm_mean, aes(x = value)) +
                    panel.grid.minor = element_blank())
 shapiro.test(log_tpm_mean$value) #not gaussian
 
-log_tpm_median <- data.frame(value = apply(log_tpm[,3:ncol(log_tpm)], 1, median))
+log_tpm_median <- data.frame(value = apply(log_tpm, 2, median))
 median_hist <- ggplot(log_tpm_median, aes(x = value)) +
                geom_histogram(binwidth = 0.5, fill = "lightgreen", 
                               color = "black", bins = 100) +
@@ -76,7 +86,7 @@ median_hist <- ggplot(log_tpm_median, aes(x = value)) +
                      panel.grid.minor = element_blank())
 shapiro.test(log_tpm_median$value) #not gaussian
 
-log_tpm_max <- data.frame(value = apply(log_tpm[,3:ncol(log_tpm)], 1, max))
+log_tpm_max <- data.frame(value = apply(log_tpm, 2, max))
 max_hist <- ggplot(log_tpm_max, aes(x = value)) +
                geom_histogram(binwidth = 0.5, fill = "lavender", 
                               color = "black", bins = 100) +
@@ -86,7 +96,7 @@ max_hist <- ggplot(log_tpm_max, aes(x = value)) +
                      panel.grid.minor = element_blank())
 shapiro.test(log_tpm_max$value) #not gaussian
 
-log_tpm_min <- data.frame(value = apply(log_tpm[,3:ncol(log_tpm)], 1, min))
+log_tpm_min <- data.frame(value = apply(log_tpm, 2, min))
 min_hist <- ggplot(log_tpm_min, aes(x = value)) +
             geom_histogram(binwidth = 0.5, fill = "lightpink", 
                            color = "black", bins = 100) +
@@ -157,14 +167,14 @@ total_counts_hist <- ggplot(total_counts, aes(x = value)) +
 grid.arrange(pos_counts_hist, neg_counts_hist, total_counts_hist, nrow = 1)
 
 # crp positively controls 310 genes, lets do a subset
-crp_exp <- log_tpm[log_tpm$Gene.Name == "crp", 3:ncol(log_tpm)]
+crp_exp <- log_tpm[,colnames(log_tpm) == "crp"]
 crp_target <- positive_reg[positive_reg$X3.RegulatorGeneName == "crp",]
-crp_target_exp <- log_tpm[log_tpm$Gene.Name %in% crp_target$X5.regulatedName,]
+crp_target_exp <- log_tpm[,colnames(log_tpm) %in% crp_target$X5.regulatedName]
 #crp_target_exp$mean_exp <- apply(crp_target_exp[,3:ncol(crp_target_exp)], 1, mean)
 
-crp_target_mean_conditions <- apply(crp_target_exp[,3:ncol(crp_target_exp)], 2, mean)
+crp_target_mean_conditions <- apply(crp_target_exp, 1, mean)
 
-training <- data.frame(crp_exp = unlist(crp_exp), target = unlist(crp_target_mean_conditions))
+training <- data.frame(crp_exp = unlist(t(crp_exp)), target = unlist(crp_target_mean_conditions))
 
 fit_control <- trainControl(## 10-fold CV
                             method = "repeatedcv",
@@ -190,6 +200,30 @@ crp_res <- data.frame(fitted.values = crp_lm$finalModel$fitted.values,
 residuals <-  ggplot(crp_res, aes(x = fitted.values, y = residuals)) +
               geom_point() +
               geom_hline(yintercept = 0, color = "red")
+
+#try to fit with 300 features
+crp_exp <- t(crp_exp)
+colnames(crp_exp) <- "crp"
+crp_full <- data.frame(cbind(crp_exp, crp_target_exp))
+
+crp_preProc <- preProcess(crp_full, method = "pca")
+crp_train <- predict(crp_preProc, crp_full)
+
+crp_lm2 <- train(crp ~., 
+                 data = crp_full,
+                 method = "lm",
+                 preProcess = c("center", "scale", "pca"),
+                 trControl = fit_control)
+
+#lasso regression (L1 regularization)
+crp_lasso <- train(crp ~., 
+                 data = crp_full,
+                 method = "lasso",
+                 preProcess = c("center", "scale", "pca"),
+                 trControl = fit_control)
+
+
+crp_lm2$finalModel
 
 # Scaling with RobustScaler
 # log_tpm_norm <- log_tpm
