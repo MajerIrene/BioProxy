@@ -4,6 +4,7 @@ library(dplyr)
 library(ggplot2)
 library(grid)
 library(gridExtra)
+library(caret)
 
 # Import file 
 log_tpm <- read.csv("log_tpm_full.csv", row.names = 1)
@@ -156,12 +157,39 @@ total_counts_hist <- ggplot(total_counts, aes(x = value)) +
 grid.arrange(pos_counts_hist, neg_counts_hist, total_counts_hist, nrow = 1)
 
 # crp positively controls 310 genes, lets do a subset
+crp_exp <- log_tpm[log_tpm$Gene.Name == "crp", 3:ncol(log_tpm)]
 crp_target <- positive_reg[positive_reg$X3.RegulatorGeneName == "crp",]
 crp_target_exp <- log_tpm[log_tpm$Gene.Name %in% crp_target$X5.regulatedName,]
-crp_target_exp$mean_exp <- apply(crp_target_exp[,3:ncol(crp_target_exp)], 1, mean)
+#crp_target_exp$mean_exp <- apply(crp_target_exp[,3:ncol(crp_target_exp)], 1, mean)
 
-# caccapupu <- apply(crp_target_exp[,3:(ncol(crp_target_exp)-1)], 2, mean)
-# plot(caccapupu, log_tpm[log_tpm$Gene.Name == "crp", 3:ncol(log_tpm)])
+crp_target_mean_conditions <- apply(crp_target_exp[,3:ncol(crp_target_exp)], 2, mean)
+
+training <- data.frame(crp_exp = unlist(crp_exp), target = unlist(crp_target_mean_conditions))
+
+fit_control <- trainControl(## 10-fold CV
+                            method = "repeatedcv",
+                            number = 10,
+                            ## repeated ten times
+                            repeats = 10)
+
+crp_lm <- train(crp_exp ~ target, 
+                data = training,
+                method = "lm",
+                trControl = fit_control)
+
+scatterplot <- ggplot(training, aes(x = target, y = crp_exp)) +
+               geom_point(size = 2) + 
+               geom_abline(intercept = crp_lm$finalModel$coefficients[[1]],
+                           slope = crp_lm$finalModel$coefficients[[2]],
+                           color = "red",
+                           linewidth = 1)  
+
+crp_res <- data.frame(fitted.values = crp_lm$finalModel$fitted.values,
+                      residuals = crp_lm$finalModel$residuals)
+
+residuals <-  ggplot(crp_res, aes(x = fitted.values, y = residuals)) +
+              geom_point() +
+              geom_hline(yintercept = 0, color = "red")
 
 # Scaling with RobustScaler
 # log_tpm_norm <- log_tpm
