@@ -157,12 +157,12 @@ neg_counts_hist <- ggplot(neg_counts, aes(x = value)) +
                          panel.grid.minor = element_blank())
 
 total_counts_hist <- ggplot(total_counts, aes(x = value)) +
-                   geom_histogram(binwidth = 10, fill = "lightpink", 
-                                  color = "black", bins = 20) +
-                   labs(x = "Total Regulations Count", y = "Frequency") +
-                   theme_minimal() +
-                   theme(panel.grid.major = element_blank(), 
-                         panel.grid.minor = element_blank())
+                     geom_histogram(binwidth = 10, fill = "lightpink", 
+                                    color = "black", bins = 20) +
+                     labs(x = "Total Regulations Count", y = "Frequency") +
+                     theme_minimal() +
+                     theme(panel.grid.major = element_blank(), 
+                           panel.grid.minor = element_blank())
 
 grid.arrange(pos_counts_hist, neg_counts_hist, total_counts_hist, nrow = 1)
 
@@ -174,7 +174,7 @@ crp_target_exp <- log_tpm[,colnames(log_tpm) %in% crp_target$X5.regulatedName]
 
 crp_target_mean_conditions <- apply(crp_target_exp, 1, mean)
 
-training <- data.frame(crp_exp = unlist(t(crp_exp)), target = unlist(crp_target_mean_conditions))
+training <- data.frame(crp_exp = unlist(crp_exp), target = unlist(crp_target_mean_conditions))
 
 fit_control <- trainControl(## 10-fold CV
                             method = "repeatedcv",
@@ -202,18 +202,25 @@ residuals <-  ggplot(crp_res, aes(x = fitted.values, y = residuals)) +
               geom_hline(yintercept = 0, color = "red")
 
 #try to fit with 300 features
-crp_exp <- t(crp_exp)
-colnames(crp_exp) <- "crp"
+crp_exp <- data.frame(crp = crp_exp)
 crp_full <- data.frame(cbind(crp_exp, crp_target_exp))
-
-crp_preProc <- preProcess(crp_full, method = "pca")
-crp_train <- predict(crp_preProc, crp_full)
 
 crp_lm2 <- train(crp ~., 
                  data = crp_full,
                  method = "lm",
                  preProcess = c("center", "scale", "pca"),
                  trControl = fit_control)
+
+#to analize the pca contribution of each gene in the final model with 64 PC
+pca_results <- data.frame(crp_lm2$preProcess$rotation)
+
+#pca in another way, this also consider up to 188 PC
+crp_preProc <- preProcess(crp_full, method = c("center", "scale", "pca"))
+crp_pca <- predict(crp_preProc, crp_full)
+
+plot(crp_pca[,1], crp_pca[,2])
+plot(crp_pca[,2], crp_pca[,3])
+plot(crp_pca[,3], crp_pca[,4])
 
 #lasso regression (L1 regularization)
 crp_lasso <- train(crp ~., 
@@ -222,8 +229,7 @@ crp_lasso <- train(crp ~.,
                  preProcess = c("center", "scale", "pca"),
                  trControl = fit_control)
 
-
-crp_lm2$finalModel
+crp_lasso$finalModel
 
 # Scaling with RobustScaler
 # log_tpm_norm <- log_tpm
