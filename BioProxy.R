@@ -381,7 +381,6 @@ grid.arrange(pos_counts_hist, neg_counts_hist, total_counts_hist, nrow = 1)
 crp_exp <- log_tpm[,colnames(log_tpm) == "crp"]
 crp_target <- positive_reg[positive_reg$X3.RegulatorGeneName == "crp",]
 crp_target_exp <- log_tpm[,colnames(log_tpm) %in% crp_target$X5.regulatedName]
-#crp_target_exp$mean_exp <- apply(crp_target_exp[,3:ncol(crp_target_exp)], 1, mean)
 
 crp_target_mean_conditions <- apply(crp_target_exp, 1, mean)
 
