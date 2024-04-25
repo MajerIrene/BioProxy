@@ -36,7 +36,7 @@ if(length(w)>0){
   regulator <- regulator[-w,]
 }
 
-#or if the confidence is actually unkown
+#or if the confidence is actually unknown
 w <- which(trimws(regulator[,7])=="?")
 if(length(w)>0){
   regulator <- regulator[-w,]
@@ -227,10 +227,10 @@ crp_prova <- data.frame(fitted.values = crp_lm2$finalModel$fitted.values,
                         real_values = crp_lm2$finalModel$model$.outcome)
 
 prova <-  ggplot(crp_prova, aes(x = fitted.values, y = real_values)) +
-  geom_point() 
+          geom_point() 
 
 prova2 <- ggplot(crp_full, aes(x = gpsA, y = crp)) +
-          geom_point()+
+          geom_point() +
           geom_abline(intercept = 12.2460, slope = -0.2683, color = "red")
 
 acab <- lm(crp ~ gpsA + fucR + malY + raiA + frlR, data = crp_full)
@@ -276,13 +276,27 @@ cv_model_pcr$bestTune
 
 cv_model_pcr$results %>%
         dplyr::filter(ncomp == pull(cv_model_pcr$bestTune))
-ggplot(cv_model_pcr)
+        ggplot(cv_model_pcr)
 
-vip(cv_model_pcr, num_features = 50, method = "model")
+prova_vi <- vi(cv_model_pcr, num_features = 50, method = "model")
 
-crp_lm2 <- train(crp ~., 
-                 data = crp_full,
-                 method = "lm",
-                 preProcess = c("center", "scale", "pca"),
-                 trControl = fit_control, 
-                 tuneLength = 153)
+formula1 <- paste0("crp  ~ ", paste(prova_vi$Variable[1:70], collapse = " + "))
+formula2 <- paste0("crp  ~ ", paste(prova_vi$Variable[1:100], collapse = " + "))
+formula3 <- paste0("crp  ~ ", paste(prova_vi$Variable[1:50], collapse = " + "))
+
+crp_proxy1 <- train(as.formula(formula1), 
+                   data = crp_full,
+                   method = "lm",
+                   trControl = fit_control)
+
+crp_proxy2 <- train(as.formula(formula2), 
+                   data = crp_full,
+                   method = "lm",
+                   trControl = fit_control)
+
+crp_proxy3 <- train(as.formula(formula3), 
+                    data = crp_full,
+                    method = "lm",
+                    trControl = fit_control)
+
+anova(crp_proxy3$finalModel, crp_proxy2$finalModel, crp_proxy1$finalModel)
