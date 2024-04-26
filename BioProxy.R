@@ -9,6 +9,8 @@ library(glmnet)
 library(sigmoid)
 library(vip)
 
+set.seed(42)
+
 # Import file 
 log_tpm <- read.csv("log_tpm_full.csv", row.names = 1)
 
@@ -173,7 +175,6 @@ grid.arrange(pos_counts_hist, neg_counts_hist, total_counts_hist, nrow = 1)
 crp_exp <- log_tpm[,colnames(log_tpm) == "crp"]
 crp_target <- positive_reg[positive_reg$X3.RegulatorGeneName == "crp",]
 crp_target_exp <- log_tpm[,colnames(log_tpm) %in% crp_target$X5.regulatedName]
-#crp_target_exp$mean_exp <- apply(crp_target_exp[,3:ncol(crp_target_exp)], 1, mean)
 
 crp_target_mean_conditions <- apply(crp_target_exp, 1, mean)
 
@@ -233,7 +234,6 @@ prova2 <- ggplot(crp_full, aes(x = gpsA, y = crp)) +
           geom_point() +
           geom_abline(intercept = 12.2460, slope = -0.2683, color = "red")
 
-acab <- lm(crp ~ gpsA + fucR + malY + raiA + frlR, data = crp_full)
 
 plot(crp_lm2$finalModel)
 
@@ -241,62 +241,73 @@ plot(crp_lm2$finalModel)
 #to analize the pca contribution of each gene in the final model with 64 PC
 pca_results <- data.frame(crp_lm2$preProcess$rotation)
 
-#pca in another way, this also consider up to 188 PC
-crp_preProc <- preProcess(crp_full, method = c("center", "scale", "pca"))
-crp_pca <- predict(crp_preProc, crp_full)
 
-plot(crp_pca[,1], crp_pca[,2])
-plot(crp_pca[,2], crp_pca[,3])
-plot(crp_pca[,3], crp_pca[,4])
+# plot(crp_pca[,1], crp_pca[,2])
+# plot(crp_pca[,2], crp_pca[,3])
+# plot(crp_pca[,3], crp_pca[,4])
 
 #lasso regression (L1 regularization)
-crp_lasso <- train(crp ~., 
-                   data = crp_full,
-                   method = "lasso",
-                   preProcess = c("center", "scale", "pca"),
-                   trControl = fit_control)
+# crp_lasso <- train(crp ~., 
+#                    data = crp_full,
+#                    method = "lasso",
+#                    preProcess = c("center", "scale", "pca"),
+#                    trControl = fit_control)
+# 
+# crp_lasso$finalModel$beta.pure
+# 
+# print(crp_lasso)
+# 
+# plot(crp_lasso$finalModel, xvar = "penalty")
 
-crp_lasso$finalModel$beta.pure
+### PCR
+crp_pca <- preProcess(crp_full[,-1], method = c("center", "scale", "pca"), thresh = 0.8)
+crp_pca <- predict(crp_pca, crp_full)
 
-print(crp_lasso)
-
-plot(crp_lasso$finalModel, xvar = "penalty")
-
-### PCR 
+# it takes the number of PC that explain 95% of variance
+set.seed(42)
 cv_model_pcr <- train(crp ~., 
                       data = crp_full, 
-                      method = "pcr",
+                      method = "lm",
                       trControl = fit_control,
-                      preProcess = c("zv", "center", "scale"), 
-                      tuneLength = 160)
+                      preProcess = c("center", "scale", "pca", "zv"))
 
-print(cv_model_pcr)
+cv_model_pcr$preProcess$numComp
 
 cv_model_pcr$bestTune
 
 cv_model_pcr$results %>%
         dplyr::filter(ncomp == pull(cv_model_pcr$bestTune))
-        ggplot(cv_model_pcr)
+ggplot(cv_model_pcr)
 
-prova_vi <- vi(cv_model_pcr, num_features = 50, method = "model")
 
-formula1 <- paste0("crp  ~ ", paste(prova_vi$Variable[1:70], collapse = " + "))
-formula2 <- paste0("crp  ~ ", paste(prova_vi$Variable[1:100], collapse = " + "))
-formula3 <- paste0("crp  ~ ", paste(prova_vi$Variable[1:50], collapse = " + "))
+### LRP (29 genes)
+lrp_exp <- log_tpm[,colnames(log_tpm) == "lrp"]
+lrp_target <- positive_reg[positive_reg$X3.RegulatorGeneName == "lrp",]
+lrp_target_exp <- log_tpm[,colnames(log_tpm) %in% lrp_target$X5.regulatedName]
 
-crp_proxy1 <- train(as.formula(formula1), 
-                   data = crp_full,
-                   method = "lm",
-                   trControl = fit_control)
+lrp_exp <- data.frame(lrp = lrp_exp)
+lrp_full <- data.frame(cbind(lrp_exp, lrp_target_exp))
 
-crp_proxy2 <- train(as.formula(formula2), 
-                   data = crp_full,
-                   method = "lm",
-                   trControl = fit_control)
+set.seed(42)
+lrp_lm <- train(lrp ~., 
+                 data = lrp_full,
+                 method = "lm",
+                 preProcess = c("center", "scale", "pca", "zv"),
+                 trControl = fit_control)
+summary(lrp_lm$finalModel)
 
-crp_proxy3 <- train(as.formula(formula3), 
-                    data = crp_full,
-                    method = "lm",
-                    trControl = fit_control)
+### rclR (3 genes)
+rclR_exp <- log_tpm[,colnames(log_tpm) == "rclR"]
+rclR_target <- positive_reg[positive_reg$X3.RegulatorGeneName == "rclR",]
+rclR_target_exp <- log_tpm[,colnames(log_tpm) %in% rclR_target$X5.regulatedName]
 
-anova(crp_proxy3$finalModel, crp_proxy2$finalModel, crp_proxy1$finalModel)
+rclR_exp <- data.frame(rclR = rclR_exp)
+rclR_full <- data.frame(cbind(rclR_exp, rclR_target_exp))
+
+set.seed(42)
+rclR_lm <- train(rclR ~., 
+                 data = rclR_full,
+                 method = "lm",
+                 preProcess = c("center", "scale", "pca", "zv"),
+                 trControl = fit_control)
+summary(rclR_lm$finalModel)
