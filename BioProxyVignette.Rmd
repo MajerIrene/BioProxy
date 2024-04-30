@@ -3,16 +3,15 @@ title: "BioProxy"
 output: html_notebook
 ---
 
-# Bioproxy
+# Introduction
 
-*Escherichia coli* is a gram negative bacterium and it is the most studied bacterial model organism for many reasons like its ability to grow fast on cheap mediums and the fact that it can be genetically manipulated and modified much easier with respect with eukaryotic organisms like yeast or animals. When an organism is as studied as *E. coli* the amount of data available about it can be massive, for this reason we would like to perform a bioinformatic analysis to extract knowledge from on one of the many RNA-seq dataset available for *E.coli*
+*Escherichia coli* is a gram negative bacterium and it is the most studied bacterial model organism for many reasons like its ability to grow fast on cheap media and the fact that it can be genetically manipulated and modified much easier with respect to eukaryotic organisms like yeast or animals or even other bacteria. When an organism is as studied as *E. coli* the amount of data available about it can be massive, for this reason we would like to perform a bioinformatic analysis to extract knowledge from on one of the many RNA-seq dataset available for *E. coli*.
 
-This project aims to establish a proxy for determining the activity of transcription factors based on the expression levels of the genes regulated by those factors. In prokaryotes genes with related functions are encoded together within the same genome block, which is called **operon**, and they are usually transcribed together in a so called **polycistronic transcript** because they are under the control of the same promoter. 
+This project aims to establish a proxy for determining the activity of transcription factors based on the expression levels of the genes regulated by those factors. In prokaryotes genes with related functions are encoded together within the same genome block, which is called **operon**, and they are usually transcribed together in a so called **polycistronic transcript** because they are under the control of the same promoter.
 
-The null hypothesis posits that the abundance of transcripts serves as a reliable proxy for activity. However, this assumption may not hold for all transcription factors. Some factors are active only when phosphorylated, meaning that their transcripts may be constitutively expressed while their activity depends on phosphorylation, correlating instead with the activity of the corresponding kinase.
+The null hypothesis posits that the abundance of transcripts serves as a reliable proxy for activity of the regulator. However, this assumption may not hold for all transcription factors. Some factors are active only when phosphorylated, meaning that their transcripts may be constitutively expressed while their activity depends on phosphorylation, correlating instead with the activity of the corresponding kinase.
 
-We will also focus on developing a general model to relate transcription factor activity to transcript abundance. Significant deviations from this model could indicate transcription factors whose activity is not accurately reflected by transcript levels.
-One challenge of this approach is the fact that genes of the same operon may be highly co-expressed together which is a problem for many models like linear regression, so we will try to address it during our analysis.
+We will also focus on developing a general model to relate transcription factor activity to transcript abundance. Significant deviations from this model could indicate transcription factors whose activity is not accurately reflected by transcript levels. One challenge of this approach is the fact that genes of the same operon may be highly co-expressed together which is a problem for many models like linear regression, so we will try to address it during our analysis.
 
 ## Table of Contents
 
@@ -20,7 +19,7 @@ Here are the steps that we performed in our analysis
 
 1.  [Library loading]
 
-2.  [Preprocessing]
+2.  [Pre-processing]
 
 3.  Exploratory analysis
 
@@ -38,15 +37,14 @@ library(gridExtra)
 library(caret)
 library(glmnet)
 library(igraph)
-library(sigmoid)
 library(vip)
 library(ggrepel)
 set.seed(123)
 ```
 
-## Preprocessing
+## Pre-processing
 
-Let's start importing the dataset from [PreciseDB](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC540045/) that contains theexpression levels for 3,923 genes in E. coli for 278 different condition
+Let's start importing the dataset from [PreciseDB](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC540045/) which is an RNA-seq compendium for *Escherichia coli* from the Systems Biology Research group at UC San Diego. that contains the expression levels for 3,923 genes in E. coli for 278 different condition. The approach they used was culturing bacteria on many different media, then they measured gene expression values. Then they proceeded to knock-out many different genes for each condition and they measured expression again expecting variations of expression, for example they knocked out a gene for iron metabolism on a medium containing iron and this may for sure affect the expression levels of the *E.coli* culture.
 
 ```{r}
 # Import file 
@@ -54,13 +52,13 @@ log_tpm <- read.csv("log_tpm_full.csv", row.names = 1)
 log_tpm
 ```
 
-Next we want to perform some preprocessing. First we want to exclude:
+Next we want to perform some pre-processing. First we want to exclude:
 
--   Condition with knockout genes
+-   Condition with knock-out genes
 
 -   Genes with isoforms
 
-+++ WHY +++
+For the nature of our analysis we are not interested in the conditions in which a gene is knocked-out because the influence of the knock-out gene may be huge on its related pathways and we excluded them because we want unbiased results. Researchers of PreciseDB also collected expression data about many gene isoforms and for the same genes they did not collect data about the full transcript. During the preprocess this would have resulted in having unmappable bnumbers and duplicate genes so we removed them from the dataset before proceeding.
 
 ```{r}
 # Exclude condition with knockout genes
@@ -84,9 +82,9 @@ regulator
 
 We decide to eliminate:
 
--   Lines that are not referred to a protein regulator
+-   Entries that are not referred to a protein regulator.
 
--   Relationships reported as Weak or Unknown
+-   Relationships reported as Weak or Unknown to work only on meaningful interactions.
 
 ```{r}
 regulator <- regulator[which(regulator[, 2] != "ppGpp"), ]
@@ -104,9 +102,9 @@ if(length(w)>0){
 nrow(regulator)
 ```
 
-There is a discrepancy between the gene identifiers present in the regulatory network obtained from RegulonDB and those in the PreciseDB dataset. While the regulatory network uses gene names, our dataset contained identifiers in the form of Bnums. So it's better to convert bnums to gene names to facilitate comparison and downstream analysis. In addition we decided to:
+There is a discrepancy between the gene identifiers present in the regulatory network obtained from RegulonDB and those in the PreciseDB dataset. While the regulatory network uses gene names, our dataset contained identifiers in the form of bnumbers. So it's better to convert bnumbers to gene names to facilitate comparison and downstream analysis. In addition we decided to:
 
--   Remove unmapped genes
+-   Remove entries with bnumbers that don't map with a gene name
 
 -   Remove duplicate genes
 
@@ -132,65 +130,67 @@ log_tpm <- subset(log_tpm, !(log_tpm$Gene.Name == "insI2"))
 rownames(log_tpm) <- log_tpm$Gene.Name
 log_tpm <- log_tpm[,3:ncol(log_tpm)]
 
-#transpose log_tpm
+#transpose log_tpm in order to have genes as columns and conditions as rows
 log_tpm <- t(log_tpm)
 ```
 
 ## Exploratory analysis
 
-Now let's analyze the distribution of the expression level to understand which is the best value to chose: mean, median, maximum and minimum of expression. We also want check if the distributions follow a Gaussian with the Shapiro--Wilk test:
+We would like to verify if we can use one the four major summary statistics (mean, median, maximum, minimum of expression) of each gene to model the *relationship between the targets and their regulator*. Now let's analyze the distribution of these statistics to understand which is the best value to choose, if any, then we also want check if they follow a **Gaussian distribution** using the Shapiro--Wilk test which computes the W statistics as follows:
 
 $$
 W = \dfrac{\big(\sum^n _ {i=n} a_i x_{(i)} \big ) ^2}{\sum^n _ {i=n} (x_i - \bar{x})^2}
 $$
 
-Where:
+Then this W value is used for the hypothesis testing that follows:
 
 $$
 H_o: \text{a sample } x_1, \cdots, x_n \text{ is drawn from a normally distributed population.} \\
 H_a: \text{a sample } x_1, \cdots, x_n \text{ is not drawn from a normally distributed population.}
 $$
 
+If the test returns a *p-value* lower then the threshold 0.05 it means that the data **do not** follow a normal distribution.
+
 ```{r}
 # Histograms of Summary Statistics
 log_tpm_mean <- data.frame(value = apply(log_tpm, 2, mean))
 mean_hist <- ggplot(log_tpm_mean, aes(x = value)) +
-  geom_histogram(binwidth = 0.5, fill = "skyblue", 
-                 color = "black", bins = 100) +
-  labs(x = "Mean log-TPM", y = "Frequency") +
-  theme_minimal() +
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank())
+                    geom_histogram(binwidth = 0.5, fill = "skyblue", 
+                                   color = "black", bins = 100) +
+                    labs(x = "Mean log-TPM", y = "Frequency") +
+                    theme_minimal() +
+                    theme(panel.grid.major = element_blank(), 
+                          panel.grid.minor = element_blank())
 shapiro.test(log_tpm_mean$value) #not gaussian
 
 log_tpm_median <- data.frame(value = apply(log_tpm, 2, median))
 median_hist <- ggplot(log_tpm_median, aes(x = value)) +
-  geom_histogram(binwidth = 0.5, fill = "lightgreen", 
-                 color = "black", bins = 100) +
-  labs(x = "Median log-TPM", y = "Frequency") +
-  theme_minimal() +
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank())
+                      geom_histogram(binwidth = 0.5, fill = "lightgreen", 
+                                     color = "black", bins = 100) +
+                      labs(x = "Median log-TPM", y = "Frequency") +
+                      theme_minimal() +
+                      theme(panel.grid.major = element_blank(), 
+                            panel.grid.minor = element_blank())
 shapiro.test(log_tpm_median$value) #not gaussian
 
 log_tpm_max <- data.frame(value = apply(log_tpm, 2, max))
 max_hist <- ggplot(log_tpm_max, aes(x = value)) +
-  geom_histogram(binwidth = 0.5, fill = "lavender", 
-                 color = "black", bins = 100) +
-  labs(x = "Max log-TPM", y = "Frequency") +
-  theme_minimal() +
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank())
+                   geom_histogram(binwidth = 0.5, fill = "lavender", 
+                                  color = "black", bins = 100) +
+                   labs(x = "Max log-TPM", y = "Frequency") +
+                   theme_minimal() +
+                   theme(panel.grid.major = element_blank(), 
+                         panel.grid.minor = element_blank())
 shapiro.test(log_tpm_max$value) #not gaussian
 
 log_tpm_min <- data.frame(value = apply(log_tpm, 2, min))
 min_hist <- ggplot(log_tpm_min, aes(x = value)) +
-  geom_histogram(binwidth = 0.5, fill = "lightpink", 
-                 color = "black", bins = 100) +
-  labs(x = "Min log-TPM", y = "Frequency") +
-  theme_minimal() +
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank())
+                   geom_histogram(binwidth = 0.5, fill = "lightpink", 
+                                  color = "black", bins = 100) +
+                   labs(x = "Min log-TPM", y = "Frequency") +
+                   theme_minimal() +
+                   theme(panel.grid.major = element_blank(), 
+                         panel.grid.minor = element_blank())
 shapiro.test(log_tpm_min$value) #not gaussian
 
 grid.arrange(mean_hist, median_hist, max_hist, min_hist, nrow = 2, ncol = 2,
@@ -199,9 +199,9 @@ grid.arrange(mean_hist, median_hist, max_hist, min_hist, nrow = 2, ncol = 2,
 ```
 
 Based on the results of the Shapiro-Wilk tests conducted on the four distributions and their respective histograms, we can conclude that the distributions do not follow to a Gaussian (normal) distribution.\
-Consequently, this implies that chosing measures such as the mean, median, maximum, or minimum may not match the linear assumption that the data follows a Gaussian (normal) distribution.
+Consequently, this implies that choosing measures such as the mean, median, maximum, or minimum may not match the linear regression assumption that the data follows a Gaussian (normal) distribution.
 
-Now we plot some histograms to have a better idea on the number of positive and negative target genes regulated by each regulator.
+Now we plot some histograms to have a better idea on the number of positive and negative interactions of each regulator.
 
 ```{r}
 # Histogram of how many genes are regulated by each gene
@@ -258,10 +258,10 @@ total_counts_hist <- ggplot(total_counts, aes(x = value)) +
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank())
 
-grid.arrange(pos_counts_hist, neg_counts_hist, total_counts_hist, nrow = 1)
+grid.arrange(pos_counts_hist, neg_counts_hist, total_counts_hist, ncol = 1)
 ```
-
-There are slightly more negative regulator then positive. In addition we can also notice that the majority of regulators have less than 100 target. There is one exception: crp has 300 target.
+These histograms show how many genes are regulated by how many regulators; for example there are more than 150 genes that positively interact with 0 genes, this is not surprising because we removed weak and unknown interactions, we can also see that there is a gene that negatively controls a number of genes close to 400.
+There are slightly more negative regulators then positive. In addition we can also notice that the majority of regulators have less than 100 targets. There is one exception: crp has 300 target.
 
 ### Network analysis
 
