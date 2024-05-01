@@ -5,25 +5,27 @@ output: html_notebook
 
 # Introduction
 
-*Escherichia coli* is a gram negative bacterium and it is the most studied bacterial model organism for many reasons like its ability to grow fast on cheap media and the fact that it can be genetically manipulated and modified much easier with respect to eukaryotic organisms like yeast or animals or even other bacteria. When an organism is as studied as *E. coli* the amount of data available about it can be massive, for this reason we would like to perform a bioinformatic analysis to extract knowledge from on one of the many RNA-seq dataset available for *E. coli*.
+***Escherichia coli*** is a gram negative bacterium and it is the most studied bacterial model organism for many reasons like its ability to grow fast on cheap media and the fact that it can be genetically manipulated and modified much easier with respect to eukaryotic organisms like yeast or animals or even other bacteria. When an organism is as studied as *E. coli* the amount of data available about it can be massive, for this reason we would like to perform a bioinformatic analysis to extract knowledge from on one of the many RNA-seq dataset available for *E. coli*.
 
-This project aims to establish a proxy for determining the activity of transcription factors based on the expression levels of the genes regulated by those factors. In prokaryotes genes with related functions are encoded together within the same genome block, which is called **operon**, and they are usually transcribed together in a so called **polycistronic transcript** because they are under the control of the same promoter.
+This project aims to establish a **proxy** for determining the activity of transcription factors based on the expression levels of the genes regulated by those factors. In prokaryotes genes with related functions are encoded together within the same genome block, which is called **operon**, and they are usually transcribed together in a, so called, **polycistronic transcript** because they are under the control of the same promoter.
 
-The null hypothesis posits that the abundance of transcripts serves as a reliable proxy for activity of the regulator. However, this assumption may not hold for all transcription factors. Some factors are active only when phosphorylated, meaning that their transcripts may be constitutively expressed while their activity depends on phosphorylation, correlating instead with the activity of the corresponding kinase.
+The null hypothesis posits that the *abundance of transcripts serves as a reliable proxy for activity of the regulator*. However, this assumption may not hold for all transcription factors: some factors are active only when phosphorylated, meaning that their transcripts may be constitutively expressed while their activity depends on phosphorylation, correlating instead with the activity of the corresponding kinase.
 
-We will also focus on developing a general model to relate transcription factor activity to transcript abundance. Significant deviations from this model could indicate transcription factors whose activity is not accurately reflected by transcript levels. One challenge of this approach is the fact that genes of the same operon may be highly co-expressed together which is a problem for many models like linear regression, so we will try to address it during our analysis.
+We will also focus on developing a general model to relate transcription factor activity to transcript abundance. Significant deviations from this model could indicate transcription factors whose activity is not accurately reflected by transcript levels. One challenge of this approach is the fact that genes of the same operon may be highly *co-expressed* together which is a problem for many models like **linear regression**, so we will try to address it during our analysis.
 
 ## Table of Contents
 
 Here are the steps that we performed in our analysis
 
-1.  [Library loading]
+1.  [Introduction]
 
-2.  [Pre-processing]
+2.  [Library loading]
 
-3.  Exploratory analysis
+3.  [Pre-processing]
 
-4.  Models ...
+4.  [Exploratory Analysis]
+
+5.  [Modelling] -[cAMP Receptor Protein (crp)](#camp-receptor-protein-crp)
 
 ## Library loading
 
@@ -44,7 +46,7 @@ set.seed(123)
 
 ## Pre-processing
 
-Let's start importing the dataset from [PreciseDB](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC540045/) which is an RNA-seq compendium for *Escherichia coli* from the Systems Biology Research group at UC San Diego. that contains the expression levels for 3,923 genes in E. coli for 278 different condition. The approach they used was culturing bacteria on many different media, then they measured gene expression values. Then they proceeded to knock-out many different genes for each condition and they measured expression again expecting variations of expression, for example they knocked out a gene for iron metabolism on a medium containing iron and this may for sure affect the expression levels of the *E.coli* culture.
+Let's start importing the dataset from [PreciseDB](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC540045/) which is an RNA-seq compendium for *Escherichia coli* from the Systems Biology Research group at UC San Diego which contains the expression levels for 3,923 genes in E. coli for 278 different condition. The approach they used was culturing bacteria on many different media and they measured gene expression values then they proceeded to knock-out many different genes and cultured again on different media to measure expression again because they were expecting variations of expression; for example, they knocked out a gene for iron metabolism on a medium containing iron and this for sure affects the expression levels of the *E.coli* culture because the organism is not able to manage iron correctly anymore.
 
 ```{r}
 # Import file 
@@ -58,7 +60,7 @@ Next we want to perform some pre-processing. First we want to exclude:
 
 -   Genes with isoforms
 
-For the nature of our analysis we are not interested in the conditions in which a gene is knocked-out because the influence of the knock-out gene may be huge on its related pathways and we excluded them because we want unbiased results. Researchers of PreciseDB also collected expression data about many gene isoforms and for the same genes they did not collect data about the full transcript. During the preprocess this would have resulted in having unmappable bnumbers and duplicate genes so we removed them from the dataset before proceeding.
+For the nature of our analysis we are not interested in the conditions in which a gene is knocked-out because the influence of the knock-out gene may be huge on its related pathways, for this reason we excluded them because we want unbiased results. Researchers of PreciseDB also collected expression data about many gene isoforms, the problem is that the collection of isoforms was not complete and there was not a reliable way to decide which isoform to consider: considering all of them during the preprocessing would have resulted in having unmappable bnumbers and duplicate genes so we removed them from the dataset before proceeding.
 
 ```{r}
 # Exclude condition with knockout genes
@@ -71,7 +73,7 @@ log_tpm <- subset(log_tpm, !(rownames(log_tpm) %in% genes_with_isoforms))
 dim(log_tpm)
 ```
 
-Now we can proceed to import the regulatory network from [RegulonDB](https://regulondb.ccg.unam.mx/) that reports the target genes for each regulator.
+Now we can proceed to import the regulatory network from [RegulonDB](https://regulondb.ccg.unam.mx/) that reports the target genes for each regulator. Each row of this dataset represents an edge in a regulatory network graph and contains informations about the interaction of which the most important one is probably if the interaction is positive or negative.
 
 ```{r}
 regulator <- read.table(file="tableDataReg.csv",
@@ -80,11 +82,11 @@ regulator <- read.table(file="tableDataReg.csv",
 regulator
 ```
 
-We decide to eliminate:
+We decided to eliminate:
 
 -   Entries that are not referred to a protein regulator.
 
--   Relationships reported as Weak or Unknown to work only on meaningful interactions.
+-   Relationships reported as *Weak* or *Unknown* to work only on meaningful interactions.
 
 ```{r}
 regulator <- regulator[which(regulator[, 2] != "ppGpp"), ]
@@ -109,11 +111,13 @@ There is a discrepancy between the gene identifiers present in the regulatory ne
 -   Remove duplicate genes
 
 ```{r}
-# Loading files from ECOcyc
+# Loading the file from ECOcyc which contain the mapping bnum-genename
 map_bnum <- read.delim("mapbnum.txt", header = TRUE)
+
+# Keep only the useful columns
 map_bnum <- map_bnum[c("Gene.Name", "Accession.1")]
 
-# Map between my dataset and the file of ecocyc
+# Map between our dataset and the file of ecocyc
 log_tpm$gene_number <- rownames(log_tpm)
 log_tpm <- merge(log_tpm, map_bnum, by.x = "gene_number", by.y = "Accession.1", all.x = TRUE)
 
@@ -123,20 +127,20 @@ log_tpm <- log_tpm[, c("Gene.Name", setdiff(names(log_tpm), "Gene.Name"))]
 # Removing unmapped genes bnumber
 log_tpm <- subset(log_tpm, !is.na(Gene.Name))
 
-#removing duplicate genes (it also has all expression values equal 0 so very bad)
+# Removing duplicate genes (it also has all expression values equal 0 so very bad)
 log_tpm <- subset(log_tpm, !(log_tpm$Gene.Name == "insI2"))
 
-#setting rownames and dropping the first 2 columns
+# Setting rownames and dropping the first 2 columns
 rownames(log_tpm) <- log_tpm$Gene.Name
 log_tpm <- log_tpm[,3:ncol(log_tpm)]
 
-#transpose log_tpm in order to have genes as columns and conditions as rows
+# Transpose log_tpm in order to have genes as columns and conditions as rows
 log_tpm <- t(log_tpm)
 ```
 
-## Exploratory analysis
+## Exploratory Analysis
 
-We would like to verify if we can use one the four major summary statistics (mean, median, maximum, minimum of expression) of each gene to model the *relationship between the targets and their regulator*. Now let's analyze the distribution of these statistics to understand which is the best value to choose, if any, then we also want check if they follow a **Gaussian distribution** using the Shapiro--Wilk test which computes the W statistics as follows:
+We would like to verify if we can use one the four major summary statistics which are **mean**, **median**, **maximum** and **minimum** of expression of each gene to model the *relationship between the targets and their regulator*. Now let's analyze the distribution of these statistics to understand which is the best value to choose, if any, then we also want check if they follow a **Gaussian distribution** using the Shapiro--Wilk test which computes the W statistics as follows:
 
 $$
 W = \dfrac{\big(\sum^n _ {i=n} a_i x_{(i)} \big ) ^2}{\sum^n _ {i=n} (x_i - \bar{x})^2}
@@ -153,6 +157,8 @@ If the test returns a *p-value* lower then the threshold 0.05 it means that the 
 
 ```{r}
 # Histograms of Summary Statistics
+
+# MEAN
 log_tpm_mean <- data.frame(value = apply(log_tpm, 2, mean))
 mean_hist <- ggplot(log_tpm_mean, aes(x = value)) +
                     geom_histogram(binwidth = 0.5, fill = "skyblue", 
@@ -161,8 +167,8 @@ mean_hist <- ggplot(log_tpm_mean, aes(x = value)) +
                     theme_minimal() +
                     theme(panel.grid.major = element_blank(), 
                           panel.grid.minor = element_blank())
-shapiro.test(log_tpm_mean$value) #not gaussian
 
+# MEDIAN
 log_tpm_median <- data.frame(value = apply(log_tpm, 2, median))
 median_hist <- ggplot(log_tpm_median, aes(x = value)) +
                       geom_histogram(binwidth = 0.5, fill = "lightgreen", 
@@ -171,8 +177,8 @@ median_hist <- ggplot(log_tpm_median, aes(x = value)) +
                       theme_minimal() +
                       theme(panel.grid.major = element_blank(), 
                             panel.grid.minor = element_blank())
-shapiro.test(log_tpm_median$value) #not gaussian
 
+# MAX
 log_tpm_max <- data.frame(value = apply(log_tpm, 2, max))
 max_hist <- ggplot(log_tpm_max, aes(x = value)) +
                    geom_histogram(binwidth = 0.5, fill = "lavender", 
@@ -181,8 +187,8 @@ max_hist <- ggplot(log_tpm_max, aes(x = value)) +
                    theme_minimal() +
                    theme(panel.grid.major = element_blank(), 
                          panel.grid.minor = element_blank())
-shapiro.test(log_tpm_max$value) #not gaussian
 
+# MIN
 log_tpm_min <- data.frame(value = apply(log_tpm, 2, min))
 min_hist <- ggplot(log_tpm_min, aes(x = value)) +
                    geom_histogram(binwidth = 0.5, fill = "lightpink", 
@@ -191,27 +197,44 @@ min_hist <- ggplot(log_tpm_min, aes(x = value)) +
                    theme_minimal() +
                    theme(panel.grid.major = element_blank(), 
                          panel.grid.minor = element_blank())
-shapiro.test(log_tpm_min$value) #not gaussian
 
+# Final Plot
 grid.arrange(mean_hist, median_hist, max_hist, min_hist, nrow = 2, ncol = 2,
              top = textGrob("Histograms of Summary Statistics", 
                             gp=gpar(fontsize=16)))
 ```
 
-Based on the results of the Shapiro-Wilk tests conducted on the four distributions and their respective histograms, we can conclude that the distributions do not follow to a Gaussian (normal) distribution.\
-Consequently, this implies that choosing measures such as the mean, median, maximum, or minimum may not match the linear regression assumption that the data follows a Gaussian (normal) distribution.
+```{r}
+#MEAN
+shapiro.test(log_tpm_mean$value) #not gaussian
 
-Now we plot some histograms to have a better idea on the number of positive and negative interactions of each regulator.
+#MEDIAN
+shapiro.test(log_tpm_median$value) #not gaussian
+
+#MAXIMUM
+shapiro.test(log_tpm_max$value) #not gaussian
+
+#MINIMUM
+shapiro.test(log_tpm_min$value) #not gaussian
+```
+
+Based on the results of the Shapiro-Wilk tests conducted on the four distributions and their respective histograms, we can conclude that the distributions do not follow to a Gaussian (normal) distribution.\
+Consequently, this implies that choosing measures such as the mean, median, maximum, or minimum may not match the linear regression assumption that the data follows a Gaussian (normal) distribution, for this reason it is not possible to use one of these statistics as a predictor in our model because none of them is normally distributed but the biggest problem is that we would train a model on a single sample and it does not make any sense. In the next section about modelling we will try instead to take the mean of all the targets in every condition and fit a model with 1 feature (mean of the targets) and as many samples as the conditions that we have.
+
+Now we plot some histograms to have a better idea on the number of positive, negative and total interactions of each regulator and again we perform a Shapiro--Wilk test for each one of them to check for normality.
 
 ```{r}
-# Histogram of how many genes are regulated by each gene
+# Divide positive and negative regulation
 positive_reg <- regulator[regulator$X6.function == "+",]
 negative_reg <- regulator[regulator$X6.function == "-",]
+
+# Identify the different regulators in the dataset
 unique_regulators <- unique(regulator$X3.RegulatorGeneName)
 
 pos_counts <- c()
 neg_counts <- c()
 
+# Count how many genes are regulated by each regulator
 for(reg in unique_regulators){
   pos_counts <- c(pos_counts, 
                   count(positive_reg[positive_reg$X3.RegulatorGeneName == reg,]))
@@ -226,48 +249,60 @@ neg_counts <- unlist(neg_counts)
 names(neg_counts) <- unique_regulators
 
 pos_counts <- data.frame(value = pos_counts)
-shapiro.test(pos_counts$value) #not gaussian
-
 neg_counts <- data.frame(value = neg_counts)
-shapiro.test(neg_counts$value) #not gaussian
-
 total_counts <- data.frame(value = pos_counts$value + neg_counts$value)
-shapiro.test(total_counts$value) #not gaussian
 
+# Histograms of how many genes are regulated by each gene
+
+# Positive Counts Histogram
 pos_counts_hist <- ggplot(pos_counts, aes(x = value)) +
-  geom_histogram(binwidth = 10, fill = "skyblue", 
-                 color = "black", bins = 20) +
-  labs(x = "Positive Regulations Count", y = "Frequency") +
-  theme_minimal() +
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank())
+                          geom_histogram(binwidth = 10, fill = "skyblue", 
+                                         color = "black", bins = 20) +
+                          labs(x = "Positive Regulations Count", y = "Frequency") +
+                          theme_minimal() +
+                          theme(panel.grid.major = element_blank(), 
+                                panel.grid.minor = element_blank())
 
+# Negative Counts Histogram
 neg_counts_hist <- ggplot(neg_counts, aes(x = value)) +
-  geom_histogram(binwidth = 10, fill = "lightgreen", 
-                 color = "black", bins = 20) +
-  labs(x = "Negative Regulations Count", y = "Frequency") +
-  theme_minimal() +
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank())
+                          geom_histogram(binwidth = 10, fill = "lightgreen", 
+                                         color = "black", bins = 20) +
+                          labs(x = "Negative Regulations Count", y = "Frequency") +
+                          theme_minimal() +
+                          theme(panel.grid.major = element_blank(), 
+                                panel.grid.minor = element_blank())
 
+# Total Counts Histogram
 total_counts_hist <- ggplot(total_counts, aes(x = value)) +
-  geom_histogram(binwidth = 10, fill = "lightpink", 
-                 color = "black", bins = 20) +
-  labs(x = "Total Regulations Count", y = "Frequency") +
-  theme_minimal() +
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank())
+                            geom_histogram(binwidth = 10, fill = "lightpink", 
+                                           color = "black", bins = 20) +
+                            labs(x = "Total Regulations Count", y = "Frequency") +
+                            theme_minimal() +
+                            theme(panel.grid.major = element_blank(), 
+                                  panel.grid.minor = element_blank())
 
+# Final Plot
 grid.arrange(pos_counts_hist, neg_counts_hist, total_counts_hist, ncol = 1)
 ```
-These histograms show how many genes are regulated by how many regulators; for example there are more than 150 genes that positively interact with 0 genes, this is not surprising because we removed weak and unknown interactions, we can also see that there is a gene that negatively controls a number of genes close to 400.
-There are slightly more negative regulators then positive. In addition we can also notice that the majority of regulators have less than 100 targets. There is one exception: crp has 300 target.
+
+```{r}
+# Positive Interactions Counts normality test
+shapiro.test(pos_counts$value) #not gaussian
+
+# Negative Interactions Counts normality test
+shapiro.test(neg_counts$value) #not gaussian
+
+# Total Interactions Counts normality test
+shapiro.test(total_counts$value) #not gaussian
+```
+
+These histograms show how many genes are regulated by how many regulators, the horizontal axis indicates how many genes are controlled by the regulator and the vertical axis indicates how many regulators have that number of interactions; for example there are more than 150 regulators that positively interact with 0 genes, this is not surprising because we removed weak and unknown interactions and we can also see that there is a gene that negatively controls a number of genes close to 400. There are slightly more negative regulators that interact with at least one gene then positive. In addition we observe that majority of genes does not interact with other genes but there are some exceptions like the gene **crp** which positively interacts with 310 other genes.
 
 ### Network analysis
 
 ```{r}
 # Creating adj matrix to plot the network
-edge_list <- cbind(RagulatorName = regulator$X3.RegulatorGeneName, 
+edge_list <- cbind(RegulatorName = regulator$X3.RegulatorGeneName, 
                    Target = regulator$X5.regulatedName)
 graph <- graph_from_edgelist(edge_list)
 layout <- layout_with_fr(graph, niter=100)
@@ -278,5 +313,49 @@ plot.igraph(graph, layout=layout, vertex.label=NA, vertex.size=3, edge.arrow.siz
 
 ```
 
-```         
+## Modelling
+
+In order to find a mathematical model able to describe the complexity of this biological problem we would like to start with simpler cases and look for what might be the best approach for them then we will apply this approach to each regulator. For this reason we will individually perform the modelling on the positive interactions of 2 genes to see which model can be suitable to be applied to all the genes; We chose the genes **crp** and **gene da scegliere**
+
+### cAMP Receptor Protein (crp) {#camp-receptor-protein-crp}
+
+The protein CRP is a **global transcription regulator**, which plays a major role in carbon catabolite repression (CCR) as well as other processes because it can act as an activator, repressor, coactivator or corepressor. CRP binds cyclic AMP (cAMP) which allosterically activates it, this means that its activity should not be influenced by the activity of any kinase, then it binds to its DNA binding site to directly regulate the transcription of about 300 genes in about 200 operons and indirectly regulate the expression of about half the genome.
+
+The first thing we want to try, as anticipated in the previous section, is taking the mean of all the targets in every condition and fit a linear regression model with only this one feature. Let's start to take the data about crp expression and the expression of its targets
+
+```{r}
+# Expression of crp
+crp_exp <- log_tpm[,colnames(log_tpm) == "crp"]
+
+# List of positively regulated targets by crp
+crp_target <- positive_reg[positive_reg$X3.RegulatorGeneName == "crp",]
+
+# Expression of the targets
+crp_target_exp <- log_tpm[,colnames(log_tpm) %in% crp_target$X5.regulatedName]
+```
+
+Now we take the simple mean of all the genes of each condition, in this way we will obtain as many means as the number of samples (188) and we fit a linear regression model using this mean as the sole feature. Then we put together a dataframe with all the data needed.
+
+```{r}
+# Apply the mean to each row of the dataset (mean of each condition)
+crp_target_mean_conditions <- apply(crp_target_exp, 1, mean)
+
+# Creating the training dataframe
+crp_mean_train <- data.frame(crp_exp = unlist(crp_exp), 
+                                 targets = unlist(crp_target_mean_conditions))
+```
+
+All the models that we will fit in this project will be validated with **10-fold cross-validation**, cross-validation is a simple and widely used sampling technique for estimating prediction error to assess how the model would act against unseen data. It is often done when there is not enough data to set aside a validation set and it has many advantages like preventing overfitting by providing a more robust estimate of the model's performances and allowing model selection and hyperparameter tuning while being at the same time data efficient because all the data is used for training and testing the model. In the case of linear regression the purpose of cross-validation is only to get a robust estimate of the performances but in the next sections we will try to use it for model selection and hyperparameter tuning. The rationale of 10-fold cross-validation is very simple because it divides the dataset in 10 folds then it uses 9 for training and the last one for testing, this procedure is repeated other 9 times by changing the testing fold and by using the remaining ones for training.
+
+![](img/10-foldcv.png)
+
+As you can see from the picture above at every iteration the procedure compute an error metric and at the end it will take the average of all the metrics to gave us a more robust estimate of real testing error. The **caret package** is the R equivalent of Python scikit-learn and it allows to very easily set up the training of Machine Learning models and it also provide a very nice way to set-up a cross-validation in order to have more reliable models!
+
+```{r}
+## 10-fold CV
+fit_control <- trainControl(
+  method = "repeatedcv",
+  number = 10,
+  ## repeated ten times
+  repeats = 10)
 ```
