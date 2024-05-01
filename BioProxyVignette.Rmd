@@ -13,7 +13,7 @@ The null hypothesis posits that the *abundance of transcripts serves as a reliab
 
 We will also focus on developing a general model to relate transcription factor activity to transcript abundance. Significant deviations from this model could indicate transcription factors whose activity is not accurately reflected by transcript levels. One challenge of this approach is the fact that genes of the same operon may be highly *co-expressed* together which is a problem for many models like **linear regression**, so we will try to address it during our analysis.
 
-## Table of Contents
+### Table of Contents
 
 Here are the steps that we performed in our analysis
 
@@ -27,7 +27,7 @@ Here are the steps that we performed in our analysis
 
 5.  [Modelling] -[cAMP Receptor Protein (crp)](#camp-receptor-protein-crp)
 
-## Library loading
+# Library loading
 
 ```{r message=FALSE, warning=FALSE}
 library(readr)
@@ -41,10 +41,9 @@ library(glmnet)
 library(igraph)
 library(vip)
 library(ggrepel)
-set.seed(123)
 ```
 
-## Pre-processing
+# Pre-processing
 
 Let's start importing the dataset from [PreciseDB](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC540045/) which is an RNA-seq compendium for *Escherichia coli* from the Systems Biology Research group at UC San Diego which contains the expression levels for 3,923 genes in E. coli for 278 different condition. The approach they used was culturing bacteria on many different media and they measured gene expression values then they proceeded to knock-out many different genes and cultured again on different media to measure expression again because they were expecting variations of expression; for example, they knocked out a gene for iron metabolism on a medium containing iron and this for sure affects the expression levels of the *E.coli* culture because the organism is not able to manage iron correctly anymore.
 
@@ -138,7 +137,7 @@ log_tpm <- log_tpm[,3:ncol(log_tpm)]
 log_tpm <- t(log_tpm)
 ```
 
-## Exploratory Analysis
+# Exploratory Analysis
 
 We would like to verify if we can use one the four major summary statistics which are **mean**, **median**, **maximum** and **minimum** of expression of each gene to model the *relationship between the targets and their regulator*. Now let's analyze the distribution of these statistics to understand which is the best value to choose, if any, then we also want check if they follow a **Gaussian distribution** using the Shapiro--Wilk test which computes the W statistics as follows:
 
@@ -296,7 +295,7 @@ shapiro.test(neg_counts$value) #not gaussian
 shapiro.test(total_counts$value) #not gaussian
 ```
 
-These histograms show how many genes are regulated by how many regulators, the horizontal axis indicates how many genes are controlled by the regulator and the vertical axis indicates how many regulators have that number of interactions; for example there are more than 150 regulators that positively interact with 0 genes, this is not surprising because we removed weak and unknown interactions and we can also see that there is a gene that negatively controls a number of genes close to 400. There are slightly more negative regulators that interact with at least one gene then positive. In addition we observe that majority of genes does not interact with other genes but there are some exceptions like the gene **crp** which positively interacts with 310 other genes.
+These histograms show how many genes are regulated by how many regulators, the horizontal axis indicates how many genes are controlled by the regulator and the vertical axis indicates how many regulators have that number of interactions; for example there are more than 150 regulators that positively interact with 0 genes, this is not surprising because we removed weak and unknown interactions and we can also see that there is a gene that negatively controls a number of genes close to 400. There are slightly more negative regulators that interact with at least one gene then positive. In addition we observe that majority of genes does not interact with other genes but there are some exceptions like the gene **crp** which positively interacts with 310 other genes. We can also note that none of these is normally distributed.
 
 ### Network analysis
 
@@ -313,7 +312,7 @@ plot.igraph(graph, layout=layout, vertex.label=NA, vertex.size=3, edge.arrow.siz
 
 ```
 
-## Modelling
+# Modelling
 
 In order to find a mathematical model able to describe the complexity of this biological problem we would like to start with simpler cases and look for what might be the best approach for them then we will apply this approach to each regulator. For this reason we will individually perform the modelling on the positive interactions of 2 genes to see which model can be suitable to be applied to all the genes; We chose the genes **crp** and **gene da scegliere**
 
@@ -341,15 +340,15 @@ Now we take the simple mean of all the genes of each condition, in this way we w
 crp_target_mean_conditions <- apply(crp_target_exp, 1, mean)
 
 # Creating the training dataframe
-crp_mean_train <- data.frame(crp_exp = unlist(crp_exp), 
-                                 targets = unlist(crp_target_mean_conditions))
+crp_mean_train <- data.frame(crp = unlist(crp_exp), 
+                             targets = unlist(crp_target_mean_conditions))
 ```
 
 All the models that we will fit in this project will be validated with **10-fold cross-validation**, cross-validation is a simple and widely used sampling technique for estimating prediction error to assess how the model would act against unseen data. It is often done when there is not enough data to set aside a validation set and it has many advantages like preventing overfitting by providing a more robust estimate of the model's performances and allowing model selection and hyperparameter tuning while being at the same time data efficient because all the data is used for training and testing the model. In the case of linear regression the purpose of cross-validation is only to get a robust estimate of the performances but in the next sections we will try to use it for model selection and hyperparameter tuning. The rationale of 10-fold cross-validation is very simple because it divides the dataset in 10 folds then it uses 9 for training and the last one for testing, this procedure is repeated other 9 times by changing the testing fold and by using the remaining ones for training.
 
 ![](img/10-foldcv.png)
 
-As you can see from the picture above at every iteration the procedure compute an error metric and at the end it will take the average of all the metrics to gave us a more robust estimate of real testing error. The **caret package** is the R equivalent of Python scikit-learn and it allows to very easily set up the training of Machine Learning models and it also provide a very nice way to set-up a cross-validation in order to have more reliable models!
+As you can see from the picture above at every iteration the procedure computes an error metric and at the end it will take the average of all the metrics to gave us a more robust estimate of real testing error. The **caret package** is the R equivalent of Python scikit-learn and it allows to very easily set up the training of Machine Learning models and it also provide a very nice way to set-up a cross-validation in order to have more reliable models!
 
 ```{r}
 ## 10-fold CV
@@ -359,3 +358,88 @@ fit_control <- trainControl(
   ## repeated ten times
   repeats = 10)
 ```
+
+Let's get back to linear regression, using one feature we are in a setting for the use of **simple linear regression** which is a model that assumes that there is a linear relationship between $X$ and $Y$, in this case $Y$ is the expression of our regulator crp and $X$ is the mean of all its targets. The relationship between $X$ and $Y$ is modelled as follows:
+
+$Y \approx \beta_0 + \beta_1 X$
+
+To find a solution for this problem the **Least Squares Method** is employed so we know that $\hat{y_i} = \hat{\beta_0} + \hat{\beta_1}x_i$ is a prediction from our model and $e_i = y_i - \hat{y_i}$ is the residual error, that is the difference between the actual value $y_i$ and the predicted one $\hat{y_i}$.\
+Least squares finds a solution that minimizes the residual sum of squares of all training data, RSS.
+
+$RSS = e_1^2 + e_2^2 + \dots + e_N^2 = \sum_i (y_i - \hat{y_i})^2 = \sum_{i=1}^N (y_i - \hat{\beta_0} - \hat{\beta_1}x_i)^2$
+
+Now we compute the partial derivatives of RSS with respect to the model parameters $\hat{\beta_0}$ and $\hat{\beta_1}$ and equate them to 0. The RSS function is **globally convex**, meaning that there exist a single stationary point which is a minimum for this reason we don't need to compute the second derivative to find the global minumun and we can directly solve the equations obtained before with respect to the parameters in this way:
+
+$\hat{\beta}_{1}=\frac{\sum_{i=1}^{n}\left(x_{i}-\overline{x}\right)\left(y_{i}-\overline{y}\right)}{\sum_{i=1}^{n}\left(x_{i}-\overline{x}\right)^{2}} \quad\quad$ $\hat{\beta}_{0}=\overline{y}-\hat{\beta}_{1} \overline{x}$
+
+where $\bar{x}$ is the mean of the means of expression of crp targets in all the conditions and $\bar{y}$ is the mean expression of crp.
+
+As anticipated before the fitting of linear regression with 10-fold cross-validation with caret can be achieved in a very simple way and with few lines of code
+
+```{r}
+#cv is a random procedure so we set a random seed for reproducibility
+set.seed(123)
+
+crp_lm_mean <- train(crp ~ targets, 
+                     data = crp_mean_train,
+                     method = "lm",
+                     trControl = fit_control)
+crp_lm_mean
+```
+
+The coefficient of determination, or $R2$, is a measure that provides information about the goodness of fit of a model. In other word it is a value that tells us about the variance of the data explained by the model, it is computed using the following formula.
+
+$$
+R^2 = \dfrac{\sum _ {i} \big(\hat{y_i} -\bar{y} \big)^2}{\sum _ {i} (y_i -\bar{y})^2}
+$$
+
+$R^2$ values close to 1 tell us that the model is able to explain almost 100% of the variance of the data indicating that the model fitted very well the data and values close to 0 tell the opposite, in this case we got an $R^2$ = 0.03536782 which is a very low value and this means that the regression was not able to model the expression of the gene crp using the mean of its target. This result can be further explained by looking if some assumption of linear regression was not matched, more in detail we will now look for homoschedasticity and normality of the residuals.
+
+```{r}
+# scatterplot of the data with the regression line
+crp_lm_mean_scatterplot <- ggplot(crp_mean_train, aes(x = targets, y = crp)) +
+                           ggtitle("Scatterplot of targets mean and crp") +
+                           theme(plot.title = element_text(hjust = 0.5)) + 
+                           xlab("Targets Mean in each Condition") + 
+                           ylab("crp expression in log(TPM)") + 
+                           geom_point(size = 2) + 
+                           geom_abline(intercept = crp_lm_mean$finalModel$coefficients[[1]],
+                                       slope = crp_lm_mean$finalModel$coefficients[[2]],
+                                       color = "red",
+                                       linewidth = 1)  
+
+# Dataframe containing fitted values and the residuals
+crp_res <- data.frame(fitted.values = crp_lm_mean$finalModel$fitted.values,
+                      residuals = crp_lm_mean$finalModel$residuals)
+
+# Residuals scatterplot
+crp_lm_mean_residuals <-  ggplot(crp_res, aes(x = fitted.values, y = residuals)) +
+                          ggtitle("Residuals plot") +
+                          theme(plot.title = element_text(hjust = 0.5)) + 
+                          xlab("Fitted Values") +
+                          ylab("Residuals") + 
+                          geom_point() +
+                          geom_hline(yintercept = 0, color = "red")
+
+# Final plot
+grid.arrange(crp_lm_mean_scatterplot, crp_lm_mean_residuals, nrow = 1)
+```
+
+On the left you can see the scatterplot of the targets mean in each condition as the independent variable and the value of expression of crp in $log(TPM)$ as the dependent variable with the regression line predicted by the model above drawn; on the right you can see the scatterplots of the residuals and we can notice just by looking that one assumption of linear regression is not matched: the variance of the residuals is not constant which means that the **homeschedasticity of the residuals** assumption is not met. Now let's look for the normality of the residual to definitely.
+
+```{r}
+crp_lm_mean_qq <- ggplot(crp_res, aes(sample=residuals)) +
+                  ggtitle("Residuals QQ-plot") +
+                  theme(plot.title = element_text(hjust = 0.5)) +
+                  xlab("Theoretical Quantile") +
+                  ylab("Residuals Quantiles") + 
+                  stat_qq() + 
+                  stat_qq_line(color = "red")
+crp_lm_mean_qq
+```
+
+```{r}
+shapiro.test(crp_res$residuals)
+```
+
+By looking at the QQ-plot we can see that the points are on the line for the most part but they are skewed at the tails and considering a p-value threshold of 0.05 for the normality test we can confidently say that the residuals are **not normally distributed**: another important assumption of linear regression is not matched. Considering all the elements discussed before we conclude that this simplicistic model is not able to describe the complex relationship between a regulator and its targets.

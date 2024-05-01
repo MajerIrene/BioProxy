@@ -178,7 +178,7 @@ crp_target_exp <- log_tpm[,colnames(log_tpm) %in% crp_target$X5.regulatedName]
 
 crp_target_mean_conditions <- apply(crp_target_exp, 1, mean)
 
-training <- data.frame(crp_exp = unlist(crp_exp), target = unlist(crp_target_mean_conditions))
+crp_mean_train <- data.frame(crp_exp = unlist(crp_exp), targets = unlist(crp_target_mean_conditions))
 
 fit_control <- trainControl(## 10-fold CV
   method = "repeatedcv",
@@ -186,24 +186,24 @@ fit_control <- trainControl(## 10-fold CV
   ## repeated ten times
   repeats = 10)
 
-crp_lm <- train(crp_exp ~ target, 
-                data = training,
+crp_lm_mean <- train(crp ~ targets, 
+                data = crp_mean_train,
                 method = "lm",
                 trControl = fit_control)
 
-scatterplot <- ggplot(training, aes(x = target, y = crp_exp)) +
-  geom_point(size = 2) + 
-  geom_abline(intercept = crp_lm$finalModel$coefficients[[1]],
-              slope = crp_lm$finalModel$coefficients[[2]],
-              color = "red",
-              linewidth = 1)  
+crp_lm_mean_scatterplot <- ggplot(crp_mean_train, aes(x = targets, y = crp)) +
+                           geom_point(size = 2) + 
+                           geom_abline(intercept = crp_lm$finalModel$coefficients[[1]],
+                                       slope = crp_lm$finalModel$coefficients[[2]],
+                                       color = "red",
+                                       linewidth = 1)  
 
 crp_res <- data.frame(fitted.values = crp_lm$finalModel$fitted.values,
                       residuals = crp_lm$finalModel$residuals)
 
 residuals <-  ggplot(crp_res, aes(x = fitted.values, y = residuals)) +
-  geom_point() +
-  geom_hline(yintercept = 0, color = "red")
+              geom_point() +
+              geom_hline(yintercept = 0, color = "red")
 
 #try to fit with 300 features
 crp_exp <- data.frame(crp = crp_exp)
