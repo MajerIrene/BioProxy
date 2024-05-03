@@ -142,7 +142,7 @@ log_tpm <- t(log_tpm)
 We would like to verify if we can use one the four major summary statistics which are **mean**, **median**, **maximum** and **minimum** of expression of each gene to model the *relationship between the targets and their regulator*. Now let's analyze the distribution of these statistics to understand which is the best value to choose, if any, then we also want check if they follow a **Gaussian distribution** using the Shapiro--Wilk test which computes the W statistics as follows:
 
 $$
-W = \dfrac{\big(\sum^n _ {i=n} a_i x_{(i)} \big ) ^2}{\sum^n _ {i=n} (x_i - \bar{x})^2}
+W = \dfrac{\big(\sum^n _ {i=1} a_i x_{(i)} \big ) ^2}{\sum^n _ {i=1} (x_i - \bar{x})^2}
 $$
 
 Then this W value is used for the hypothesis testing that follows:
@@ -316,9 +316,11 @@ plot.igraph(graph, layout=layout, vertex.label=NA, vertex.size=3, edge.arrow.siz
 
 In order to find a mathematical model able to describe the complexity of this biological problem we would like to start with simpler cases and look for what might be the best approach for them then we will apply this approach to each regulator. For this reason we will individually perform the modelling on the positive interactions of 2 genes to see which model can be suitable to be applied to all the genes; We chose the genes **crp** and **gene da scegliere**
 
-### cAMP Receptor Protein (crp) {#camp-receptor-protein-crp}
+## cAMP Receptor Protein (crp) {#camp-receptor-protein-crp}
 
 The protein CRP is a **global transcription regulator**, which plays a major role in carbon catabolite repression (CCR) as well as other processes because it can act as an activator, repressor, coactivator or corepressor. CRP binds cyclic AMP (cAMP) which allosterically activates it, this means that its activity should not be influenced by the activity of any kinase, then it binds to its DNA binding site to directly regulate the transcription of about 300 genes in about 200 operons and indirectly regulate the expression of about half the genome.
+
+### Simple Linear Regression
 
 The first thing we want to try, as anticipated in the previous section, is taking the mean of all the targets in every condition and fit a linear regression model with only this one feature. Let's start to take the data about crp expression and the expression of its targets
 
@@ -443,3 +445,85 @@ shapiro.test(crp_res$residuals)
 ```
 
 By looking at the QQ-plot we can see that the points are on the line for the most part but they are skewed at the tails and considering a p-value threshold of 0.05 for the normality test we can confidently say that the residuals are **not normally distributed**: another important assumption of linear regression is not matched. Considering all the elements discussed before we conclude that this simplicistic model is not able to describe the complex relationship between a regulator and its targets.
+
+### Multivariate Linear Regression
+
+Since only one variable was not enough to explain the relationship between the regulator and its targets we will now try to extend linear regression in order to include more variables in the model. Similarly to simple linear regression, we want to find the values for the model's parameters that minimize the residual sum of squares. The mathematical formulation of a multivariate linear regression is the following:
+
+$$\hat{y}=\hat{\beta}_{0}+\hat{\beta}_{1} x_{1}+\hat{\beta}_{2} x_{2}+\cdots+\hat{\beta}_{p} x_{p}$$
+
+The least squares solution for this problem involves matrix multiplication and the use of the, so called, **pseudo-inverse** to compute the ${\beta}$ coefficients then it uses them to compute the model's predictions $\hat{y}$ by multiplying the vector of coefficients $\hat{\beta}$ with the matrix of the predictors $X$.
+
+$\hat{\beta}=\left(\mathbf{X}^{T} \mathbf{X}\right)^{-1} \mathbf{X}^{T} \mathbf{y} \quad\quad$ with $X$ a $N \times (p+1)$ matrix, $y$ a $N \times 1$ vector
+
+$\hat{\mathbf{y}}=\mathbf{X} \hat{\beta}=\mathbf{X}\left(\mathbf{X}^{T} \mathbf{X}\right)^{-1} \mathbf{X}^{T} \mathbf{y} \quad\quad$ with $\hat{y}$ the predicted value for each sample
+
+The first step is creating a dataframe containing the expression of crp and of all its targets.
+
+```{r}
+crp_exp <- data.frame(crp = crp_exp)
+crp_full <- data.frame(cbind(crp_exp, crp_target_exp))
+```
+
+Then we train a model using all the target genes as predictors for crp expression with no further pre-processing and we cross-validate it.
+
+```{r, warning = FALSE}
+set.seed(123)
+crp_lm <- train(crp ~., 
+                data = crp_full,
+                method = "lm",
+                trControl = fit_control)
+crp_lm
+```
+
+As you can see the $R^2$ of this model is still not satisfying at all and the RMSE is also very high: the Root Mean Square Error (RMSE) is a metric that describes the average distance between the predicted values and the real values, which means that a value of RMSE = 9.858278 is very high in the context of gene expression because we are working in logarithmic scale. The reason why this model is so bad is directly told us by caret with a warning message (here suppressed) which says that the model was not able to obtain a lot of $\beta$ coefficients because our predictor variables are correlated and an important assumption of linear regression is the **independence of the predictor variables**. This strong correlation between our variables is expected because they are all genes controlled by our regulator crp so it makes very much sense that they are correlated and it is also one of the reasons of this analysis. In order to remove this multi-collinearity we will try 2 main approaches: **feature selection** and **dimensionality reduction.**
+
+### Lasso Regression
+
+The first approach we want to try is the Lasso Regression that is essentially multivariate linear regression but with the introduction of a **penalization term** which regularizes the estimates of the coefficients. This method is part of the family of the **shrinkage methods** and its main advantage is that it can force some of the coefficients of the model to be equal to 0 which means that it is also an effective way to perform feature selection. For this purpose Lasso minimizes the following function:
+
+$$
+\sum^n _{i=1} (y_i - \beta_0 - \sum^p _{j = 1}\beta_jx_ij)^2 + \lambda\sum^p_{j = 1}|\beta_j|
+$$
+
+Here p is the number of predictors (number of targets of crp) and $\lambda$ is a tunable hyperparameter which tells us how much we can "spend" in terms of coefficients, the right value of $\lambda$ forces some coefficients to 0 and perform feature selection. The best value for $\lambda$ has to be found with cross-validation for hyperparameter selection, it is interesting to note that if $\lambda$ = 0 this minimization is simply the least squares method. Another important thing to do is to scale our data because Lasso is a method sensible to the scale, luckily caret can do this very easily using the preProcess argument in the train function.
+
+```{r, warning = FALSE}
+# Tuning grid for Lasso 
+tune_grid_lasso <- expand.grid(alpha = 1, #tell the function to perform lasso
+                               lambda = 10^(-5:5)) #values of lambda to try
+
+# Lasso training, cv and hyperparameter tuning
+crp_lasso <- train(crp ~., 
+                   data = crp_full,
+                   method = "glmnet",
+                   preProcess = c("center", "scale"), #this basically transform in Z scores
+                   trControl = fit_control,
+                   tuneGrid = tune_grid_lasso)
+crp_lasso
+```
+
+For the tuning of $\lambda$ we tried powers of 10 from $10^{-5}$ to $10^5$ and as you can see for values greater than $10^{-1}$ the model was not able to correctly converge (caret gave a warning we suppressed) for the same reasons of linear regression discussed before but for smaller values of $\lambda$ they were able to converge and obtain good $R^2$, finally with 10-fold cross-validation (results visually shown with the plot below) we chose $\lambda = 10^{-3}$ as the final hyperparameter and the RMSE of this model is also very acceptable if we think in logarithmic scale in the context of gene expression.
+
+```{r}
+cv_lasso_plot <-  ggplot(data = crp_lasso$results, aes(x = log(lambda), y = RMSE, group=1)) +
+                  ggtitle("Cross-Validation Results") +
+                  theme(plot.title = element_text(hjust = 0.5)) +
+                  xlab("log(λ)") + 
+                  ylab("RMSE (Repeated Cross-Validation)") + 
+                  geom_line(color="blue")+
+                  geom_point()
+
+cv_lasso_plot
+```
+
+Let's now take a look to the coefficients of the model
+
+```{r}
+plot(crp_lasso$finalModel, xvar = "lambda", xlab= "log(λ)")
+```
+
+In this messy plot each line represents how the estimated coefficient $\hat\beta$ of a gene changes with respect to the value of $\lambda$, as you can see the majority of these lines go to 0 before $log(\lambda) = -3$ so these genes have their coefficient set to 0 while the remaining genes have a coefficient different from 0.\
+Now we know that Lasso may be a reliable method for the modelling of our regulator-target relationship but it is heavily dependent on the value of $\lambda$ chosen which might be different for other regulators, when we will analize all the genes we will try to verify this possibility.
+
+### Principal Component Regression
