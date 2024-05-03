@@ -506,7 +506,7 @@ crp_lasso
 For the tuning of $\lambda$ we tried powers of 10 from $10^{-5}$ to $10^5$ and as you can see for values greater than $10^{-1}$ the model was not able to correctly converge (caret gave a warning we suppressed) for the same reasons of linear regression discussed before but for smaller values of $\lambda$ they were able to converge and obtain good $R^2$, finally with 10-fold cross-validation (results visually shown with the plot below) we chose $\lambda = 10^{-3}$ as the final hyperparameter and the RMSE of this model is also very acceptable if we think in logarithmic scale in the context of gene expression.
 
 ```{r}
-cv_lasso_plot <-  ggplot(data = crp_lasso$results, aes(x = log(lambda), y = RMSE, group=1)) +
+cv_lasso_plot <-  ggplot(data = crp_lasso$results, aes(x = log10(lambda), y = RMSE, group=1)) +
                   ggtitle("Cross-Validation Results") +
                   theme(plot.title = element_text(hjust = 0.5)) +
                   xlab("log(λ)") + 
