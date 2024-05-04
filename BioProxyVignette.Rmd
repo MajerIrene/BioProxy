@@ -489,6 +489,7 @@ $$
 Here p is the number of predictors (number of targets of crp) and $\lambda$ is a tunable hyperparameter which tells us how much we can "spend" in terms of coefficients, the right value of $\lambda$ forces some coefficients to 0 and perform feature selection. The best value for $\lambda$ has to be found with cross-validation for hyperparameter selection, it is interesting to note that if $\lambda$ = 0 this minimization is simply the least squares method. Another important thing to do is to scale our data because Lasso is a method sensible to the scale, luckily caret can do this very easily using the preProcess argument in the train function.
 
 ```{r, warning = FALSE}
+set.seed(123)
 # Tuning grid for Lasso 
 tune_grid_lasso <- expand.grid(alpha = 1, #tell the function to perform lasso
                                lambda = 10^(-5:5)) #values of lambda to try
@@ -507,7 +508,7 @@ For the tuning of $\lambda$ we tried powers of 10 from $10^{-5}$ to $10^5$ and a
 
 ```{r}
 cv_lasso_plot <-  ggplot(data = crp_lasso$results, aes(x = log10(lambda), y = RMSE, group=1)) +
-                  ggtitle("Cross-Validation Results") +
+                  ggtitle("Lasso Cross-Validation Results") +
                   theme(plot.title = element_text(hjust = 0.5)) +
                   xlab("log(λ)") + 
                   ylab("RMSE (Repeated Cross-Validation)") + 
@@ -524,6 +525,18 @@ plot(crp_lasso$finalModel, xvar = "lambda", xlab= "log(λ)")
 ```
 
 In this messy plot each line represents how the estimated coefficient $\hat\beta$ of a gene changes with respect to the value of $\lambda$, as you can see the majority of these lines go to 0 before $log(\lambda) = -3$ so these genes have their coefficient set to 0 while the remaining genes have a coefficient different from 0.\
-Now we know that Lasso may be a reliable method for the modelling of our regulator-target relationship but it is heavily dependent on the value of $\lambda$ chosen which might be different for other regulators, when we will analize all the genes we will try to verify this possibility.
+Another interesting way of visualizing the coefficients and their importance is through the use of the **vip package**. This package gives nice plots by ranking the variables with a model specific importance metric, in the case of Lasso it returns the absolute values of the coefficients and ranks them in descending order.
+
+```{r, fig.width = 9, fig.height = 16}
+vip(crp_lasso$finalModel, method = "model", num_features = 125)
+```
+
+It is very interesting to note that the first 121 gene coefficients are different from 0 and the remaining 189 gene coefficients are set to 0 by the Lasso procedure (here only 4 shown for simplicity). Let's now look at some of the most important genes and their biological function to see if their importance makes sense:
+
+1)  **sucD**: succinyl-CoA synthetase is a very important enzime in the citric acid cycle, one the most fundamental processes of every living organism thus it enables the survival of the cell. sucD specifically is part of the $\alpha$ subunit which binds CoA and phosphate while the $\beta$ subunit binds the succinate in order to catalize the synthesis of succinyl-CoA. ![](img/sucD1.png) From a biological point of view it makes sense that this gene is very important because it is part of a basic biochemical process and in the image above you can see that crp activated by cAMP is in the regulatory network of RNAP which transcribes the operon that contains sucD.
+2)  **rpsF**: 30S ribosomal subunit protein S6, as the name says, is a subunit of the ribosome which is the macromolecular complex, composed by rRNA and proteins, involved in the translation of mRNA to protein. ![](img/rpsF.PNG) Again this is a very basic biological process and also involve protein synthesis and we should remember that CRP itself is a protein so it makes much sense that the expression of this gene is able to explain the expression of crp.
+3)  **gatY**: tagatose-1,6-bisphosphate aldolase 2 is important in the process of galactitol degradation, a toxic alcohol which is a subproduct of galactose metabolism. Since galactose is a sugar used in many of the media on which the cultures of *Escherichia coli* are grown it makes sense that a gene involved in the degradation of a toxic compound related to it is important for crp, a global transcription factor, because it ensures the global survival of the cell in its environment. ![](img/gatY.PNG)
+
+Now we know that Lasso may be a reliable method for the modelling of our targets-regulator relationship but it is heavily dependent on the value of $\lambda$ chosen which might be different for other regulators, when we will analize all the genes we will try to verify this possibility.
 
 ### Principal Component Regression
