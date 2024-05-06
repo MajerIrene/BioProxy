@@ -491,7 +491,7 @@ which means that a value of RMSE = 9.858278 is very high in the context of gene 
 The first approach we want to try is the Lasso Regression that is essentially multivariate linear regression but with the introduction of a **penalization term** which regularizes the estimates of the coefficients. This method is part of the family of the **shrinkage methods** and its main advantage is that it can force some of the coefficients of the model to be equal to 0 which means that it is also an effective way to perform feature selection. For this purpose Lasso minimizes the following function:
 
 $$
-\sum^n _{i=1} (y_i - \beta_0 - \sum^p _{j = 1}\beta_jx_ij)^2 + \lambda\sum^p_{j = 1}|\beta_j|
+\sum^n _{i=1} (y_i - \beta_0 - \sum^p _{j = 1}\beta_jx_{ij})^2 + \lambda\sum^p_{j = 1}|\beta_j|
 $$
 
 Here p is the number of predictors (number of targets of crp) and $\lambda$ is a tunable hyperparameter which tells us how much we can "spend" in terms of coefficients, the right value of $\lambda$ forces some coefficients to 0 and perform feature selection. The best value for $\lambda$ has to be found with cross-validation for hyperparameter selection, it is interesting to note that if $\lambda$ = 0 this minimization is simply the least squares method. Another important thing to do is to scale our data because Lasso is a method sensible to the scale, luckily caret can do this very easily using the preProcess argument in the train function.
