@@ -1,6 +1,8 @@
 ---
 title: "BioProxy"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 # Introduction
@@ -41,6 +43,7 @@ library(glmnet)
 library(igraph)
 library(vip)
 library(ggrepel)
+library(rattle)
 ```
 
 # Pre-processing
@@ -154,7 +157,7 @@ $$
 
 If the test returns a *p-value* lower then the threshold 0.05 it means that the data **do not** follow a normal distribution.
 
-```{r}
+```{r, fig.width = 12, fig.height = 12}
 # Histograms of Summary Statistics
 
 # MEAN
@@ -222,7 +225,7 @@ Consequently, this implies that choosing measures such as the mean, median, maxi
 
 Now we plot some histograms to have a better idea on the number of positive, negative and total interactions of each regulator and again we perform a Shapiro--Wilk test for each one of them to check for normality.
 
-```{r}
+```{r, fig.width = 12, fig.height = 9}
 # Divide positive and negative regulation
 positive_reg <- regulator[regulator$X6.function == "+",]
 negative_reg <- regulator[regulator$X6.function == "-",]
@@ -299,7 +302,7 @@ These histograms show how many genes are regulated by how many regulators, the h
 
 ### Network analysis
 
-```{r}
+```{r, fig.width = 12, fig.height = 12}
 # Creating adj matrix to plot the network
 edge_list <- cbind(RegulatorName = regulator$X3.RegulatorGeneName, 
                    Target = regulator$X5.regulatedName)
@@ -399,7 +402,7 @@ $$
 
 $R^2$ values close to 1 tell us that the model is able to explain almost 100% of the variance of the data indicating that the model fitted very well the data and values close to 0 tell the opposite, in this case we got an $R^2$ = 0.03536782 which is a very low value and this means that the regression was not able to model the expression of the gene crp using the mean of its target. This result can be further explained by looking if some assumption of linear regression was not matched, more in detail we will now look for homoschedasticity and normality of the residuals.
 
-```{r}
+```{r, fig.width = 12, fig.height = 5}
 # scatterplot of the data with the regression line
 crp_lm_mean_scatterplot <- ggplot(crp_mean_train, aes(x = targets, y = crp)) +
                            ggtitle("Scatterplot of targets mean and crp") +
@@ -431,7 +434,7 @@ grid.arrange(crp_lm_mean_scatterplot, crp_lm_mean_residuals, nrow = 1)
 
 On the left you can see the scatterplot of the targets mean in each condition as the independent variable and the value of expression of crp in $log(TPM)$ as the dependent variable with the regression line predicted by the model above drawn; on the right you can see the scatterplots of the residuals and we can notice just by looking that one assumption of linear regression is not matched: the variance of the residuals is not constant which means that the **homeschedasticity of the residuals** assumption is not met. Now let's look for the normality of the residuals.
 
-```{r}
+```{r, fig.width = 12, fig.height = 5}
 crp_lm_mean_qq <- ggplot(crp_res, aes(sample=residuals)) +
                   ggtitle("Residuals QQ-plot") +
                   theme(plot.title = element_text(hjust = 0.5)) +
@@ -514,7 +517,7 @@ crp_lasso
 
 For the tuning of $\lambda$ we tried powers of 10 from $10^{-5}$ to $10^5$ and as you can see for values greater than $10^{-1}$ the model was not able to correctly converge (caret gave a warning we suppressed) for the same reasons of linear regression discussed before but for smaller values of $\lambda$ they were able to converge and obtain good $R^2$.
 
-```{r}
+```{r, fig.width = 12, fig.height = 5}
 cv_lasso_plot <-  ggplot(data = crp_lasso$results, aes(x = log10(lambda), y = RMSE, group=1)) +
                   ggtitle("Lasso Cross-Validation Results") +
                   theme(plot.title = element_text(hjust = 0.5)) +
@@ -528,7 +531,7 @@ cv_lasso_plot
 
 Finally with 10-fold cross-validation, as you can see from the plot above, we chose $\lambda = 10^{-3}$ as the final hyperparameter and the RMSE of this model is also very acceptable if we think in logarithmic scale in the context of gene expression. Let's now take a look to the coefficients of the model
 
-```{r}
+```{r, fig.width = 12, fig.height = 7}
 plot(crp_lasso$finalModel, xvar = "lambda", xlab= "log(λ)")
 ```
 
@@ -541,10 +544,55 @@ vip(crp_lasso$finalModel, method = "model", num_features = 125)
 
 It is very interesting to note that the first 121 gene coefficients are different from 0 and the remaining 189 gene coefficients are set to 0 by the Lasso procedure (here only 4 shown for simplicity). Let's now look at some of the most important genes and their biological function to see if their importance makes sense:
 
-1)  **sucD**: succinyl-CoA synthetase is a very important enzime in the citric acid cycle, one the most fundamental processes of every living organism thus it enables the survival of the cell. sucD specifically is part of the $\alpha$ subunit which binds CoA and phosphate while the $\beta$ subunit binds the succinate in order to catalize the synthesis of succinyl-CoA. ![](img/sucD1.png) From a biological point of view it makes sense that this gene is very important because it is part of a basic biochemical process and in the image above you can see that crp, activated by cAMP, is involved in the transcription of the operon that contains sucD.
-2)  **rpsF**: 30S ribosomal subunit protein S6, as the name says, is a subunit of the ribosome which is the macromolecular complex, composed by rRNA and proteins, involved in the translation of mRNA to protein. ![](img/rpsF.PNG) Again this is a very basic biological process and also involve protein synthesis and we should remember that CRP itself is a protein so it makes much sense that the expression of this gene is able to explain the expression of crp.
+1)  **sucD**: succinyl-CoA synthetase is a very important enzime in the citric acid cycle, one the most fundamental processes of every living organism thus it enables the survival of the cell. sucD specifically is part of the $\alpha$ subunit which binds CoA and phosphate while the $\beta$ subunit binds the succinate in order to catalize the synthesis of succinyl-CoA. 
+![](img/sucD1.png) 
+From a biological point of view it makes sense that this gene is very important because it is part of a basic biochemical process and in the image above you can see that crp, activated by cAMP, is involved in the transcription of the operon that contains sucD.
+2)  **rpsF**: 30S ribosomal subunit protein S6, as the name says, is a subunit of the ribosome which is the macromolecular complex, composed by rRNA and proteins, involved in the translation of mRNA to protein. ![](img/rpsF.PNG) 
+Again this is a very basic biological process and also involve protein synthesis and we should remember that CRP itself is a protein so it makes much sense that the expression of this gene is able to explain the expression of crp.
 3)  **gatY**: tagatose-1,6-bisphosphate aldolase 2 is important in the process of galactitol degradation, a toxic alcohol which is a subproduct of galactose metabolism. Since galactose is a sugar used in many of the media on which the cultures of *Escherichia coli* are grown it makes sense that a gene involved in the degradation of a toxic compound related to galactose is important for crp, a global transcription factor, because it ensures the global survival of the cell in its environment. ![](img/gatY.PNG){width="600"}
 
 Now we know that Lasso may be a reliable method for the modelling of our targets-regulator relationship but it is heavily dependent on the value of $\lambda$ chosen which might be different for other regulators, when we will analize all the genes we will try to verify this possibility.
 
 ### Principal Component Regression
+
+```{r}
+set.seed(123)
+crp_pca <- train(crp ~., 
+                 data = crp_full, 
+                 method = "lm",
+                 trControl = fit_control,
+                 preProcess = c("center", "scale", "pca"))
+
+crp_pca
+```
+
+### Regression Tree
+
+```{r}
+set.seed(123)
+# Cross-validation for regression trees
+fit_control_tree <- trainControl(
+  method = "repeatedcv",
+  number = 10,
+  repeats = 10,
+  savePredictions = "final")
+
+# Setup tuning grid for Regression Trees
+tune_grid_tree <-  expand.grid(cp = seq(from = 0, to = 0.1, by = 0.01))
+
+# Training Regression Tree
+crp_tree <- train(crp ~., 
+                  data = crp_full,
+                  method = "rpart",
+                  trControl = fit_control_tree,
+                  tuneGrid = tune_grid_tree)
+crp_tree
+```
+
+```{r}
+print(crp_tree$finalModel)
+```
+
+```{r, fig.width = 12, fig.height = 12}
+fancyRpartPlot(crp_tree$finalModel, sub = "")
+```
