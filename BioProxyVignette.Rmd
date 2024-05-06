@@ -45,7 +45,7 @@ library(ggrepel)
 
 # Pre-processing
 
-Let's start importing the dataset from [PreciseDB](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC540045/) which is an RNA-seq compendium for *Escherichia coli* from the Systems Biology Research group at UC San Diego which contains the expression levels for 3,923 genes in E. coli for 278 different condition. The approach they used was culturing bacteria on many different media and they measured gene expression values then they proceeded to knock-out many different genes and cultured again on different media to measure expression again because they were expecting variations of expression; for example, they knocked out a gene for iron metabolism on a medium containing iron and this for sure affects the expression levels of the *E.coli* culture because the organism is not able to manage iron correctly anymore.
+Let's start importing the dataset from [PreciseDB](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC540045/) which is an RNA-seq compendium for *Escherichia coli* from the Systems Biology Research group at UC San Diego which contains the expression levels for 3,923 genes in E. coli for 278 different condition. The approach they used was culturing bacteria on many different media and they measured gene expression values then they proceeded to knock-out many different genes and cultured again on the same media to measure expression again because they were expecting variations of expression; for example, they knocked out a gene for iron metabolism on a medium containing iron and this for sure affects the expression levels of the *E.coli* culture because the organism is not able to manage iron correctly anymore.
 
 ```{r}
 # Import file 
@@ -72,7 +72,7 @@ log_tpm <- subset(log_tpm, !(rownames(log_tpm) %in% genes_with_isoforms))
 dim(log_tpm)
 ```
 
-Now we can proceed to import the regulatory network from [RegulonDB](https://regulondb.ccg.unam.mx/) that reports the target genes for each regulator. Each row of this dataset represents an edge in a regulatory network graph and contains informations about the interaction of which the most important one is probably if the interaction is positive or negative.
+Now we can proceed to import the regulatory network from [RegulonDB](https://regulondb.ccg.unam.mx/) that reports the target genes for each regulator. Each row of this dataset represents an edge in a regulatory network graph and contains informations about the interaction of which one of the most important one is probably if the interaction is positive or negative.
 
 ```{r}
 regulator <- read.table(file="tableDataReg.csv",
@@ -363,16 +363,18 @@ fit_control <- trainControl(
 
 Let's get back to linear regression, using one feature we are in a setting for the use of **simple linear regression** which is a model that assumes that there is a linear relationship between $X$ and $Y$, in this case $Y$ is the expression of our regulator crp and $X$ is the mean of all its targets. The relationship between $X$ and $Y$ is modelled as follows:
 
-$Y \approx \beta_0 + \beta_1 X$
+$$Y \approx \beta_0 + \beta_1 X$$
 
-To find a solution for this problem the **Least Squares Method** is employed so we know that $\hat{y_i} = \hat{\beta_0} + \hat{\beta_1}x_i$ is a prediction from our model and $e_i = y_i - \hat{y_i}$ is the residual error, that is the difference between the actual value $y_i$ and the predicted one $\hat{y_i}$.\
+To find a solution for this problem the **Least Squares Method** is employed: we know that $\hat{y_i} = \hat{\beta_0} + \hat{\beta_1}x_i$ is a prediction from our model and $e_i = y_i - \hat{y_i}$ is the residual error, that is the difference between the actual value $y_i$ and the predicted one $\hat{y_i}$.\
 Least squares finds a solution that minimizes the residual sum of squares of all training data, RSS.
 
-$RSS = e_1^2 + e_2^2 + \dots + e_N^2 = \sum_i (y_i - \hat{y_i})^2 = \sum_{i=1}^N (y_i - \hat{\beta_0} - \hat{\beta_1}x_i)^2$
+$$
+RSS = e_1^2 + e_2^2 + \dots + e_N^2 = \sum_i (y_i - \hat{y_i})^2 = \sum_{i=1}^N (y_i - \hat{\beta_0} - \hat{\beta_1}x_i)^2
+$$
 
 Now we compute the partial derivatives of RSS with respect to the model parameters $\hat{\beta_0}$ and $\hat{\beta_1}$ and equate them to 0. The RSS function is **globally convex**, meaning that there exist a single stationary point which is a minimum for this reason we don't need to compute the second derivative to find the global minumun and we can directly solve the equations obtained before with respect to the parameters in this way:
 
-$\hat{\beta}_{1}=\frac{\sum_{i=1}^{n}\left(x_{i}-\overline{x}\right)\left(y_{i}-\overline{y}\right)}{\sum_{i=1}^{n}\left(x_{i}-\overline{x}\right)^{2}} \quad\quad$ $\hat{\beta}_{0}=\overline{y}-\hat{\beta}_{1} \overline{x}$
+$$\hat{\beta}_{1}=\frac{\sum_{i=1}^{n}\left(x_{i}-\overline{x}\right)\left(y_{i}-\overline{y}\right)}{\sum_{i=1}^{n}\left(x_{i}-\overline{x}\right)^{2}} \quad\quad$$ $$\hat{\beta}_{0}=\overline{y}-\hat{\beta}_{1} \overline{x}$$
 
 where $\bar{x}$ is the mean of the means of expression of crp targets in all the conditions and $\bar{y}$ is the mean expression of crp.
 
@@ -389,10 +391,10 @@ crp_lm_mean <- train(crp ~ targets,
 crp_lm_mean
 ```
 
-The coefficient of determination, or $R2$, is a measure that provides information about the goodness of fit of a model. In other word it is a value that tells us about the variance of the data explained by the model, it is computed using the following formula.
+The coefficient of determination, or $R^2$, is a measure that provides information about the goodness of fit of a model. In other word it is a value that tells us about the variance of the data explained by the model, it is computed using the following formula.
 
 $$
-R^2 = \dfrac{\sum _ {i} \big(\hat{y_i} -\bar{y} \big)^2}{\sum _ {i} (y_i -\bar{y})^2}
+R^2 = \dfrac{\sum^{n} _ {i = 1} \big(\hat{y_i} -\bar{y} \big)^2}{\sum^n _ {i = 1} (y_i -\bar{y})^2}
 $$
 
 $R^2$ values close to 1 tell us that the model is able to explain almost 100% of the variance of the data indicating that the model fitted very well the data and values close to 0 tell the opposite, in this case we got an $R^2$ = 0.03536782 which is a very low value and this means that the regression was not able to model the expression of the gene crp using the mean of its target. This result can be further explained by looking if some assumption of linear regression was not matched, more in detail we will now look for homoschedasticity and normality of the residuals.
@@ -427,7 +429,7 @@ crp_lm_mean_residuals <-  ggplot(crp_res, aes(x = fitted.values, y = residuals))
 grid.arrange(crp_lm_mean_scatterplot, crp_lm_mean_residuals, nrow = 1)
 ```
 
-On the left you can see the scatterplot of the targets mean in each condition as the independent variable and the value of expression of crp in $log(TPM)$ as the dependent variable with the regression line predicted by the model above drawn; on the right you can see the scatterplots of the residuals and we can notice just by looking that one assumption of linear regression is not matched: the variance of the residuals is not constant which means that the **homeschedasticity of the residuals** assumption is not met. Now let's look for the normality of the residual to definitely.
+On the left you can see the scatterplot of the targets mean in each condition as the independent variable and the value of expression of crp in $log(TPM)$ as the dependent variable with the regression line predicted by the model above drawn; on the right you can see the scatterplots of the residuals and we can notice just by looking that one assumption of linear regression is not matched: the variance of the residuals is not constant which means that the **homeschedasticity of the residuals** assumption is not met. Now let's look for the normality of the residuals.
 
 ```{r}
 crp_lm_mean_qq <- ggplot(crp_res, aes(sample=residuals)) +
@@ -452,7 +454,7 @@ Since only one variable was not enough to explain the relationship between the r
 
 $$\hat{y}=\hat{\beta}_{0}+\hat{\beta}_{1} x_{1}+\hat{\beta}_{2} x_{2}+\cdots+\hat{\beta}_{p} x_{p}$$
 
-The least squares solution for this problem involves matrix multiplication and the use of the, so called, **pseudo-inverse** to compute the ${\beta}$ coefficients then it uses them to compute the model's predictions $\hat{y}$ by multiplying the vector of coefficients $\hat{\beta}$ with the matrix of the predictors $X$.
+The least squares solution for this problem involves matrix multiplication and the use of the, so called, **pseudo-inverse** to compute the ${\hat\beta}$ coefficients then it uses them to compute the model's predictions $\hat{y}$ by multiplying the vector of coefficients $\hat{\beta}$ with the matrix of the predictors $X$.
 
 $\hat{\beta}=\left(\mathbf{X}^{T} \mathbf{X}\right)^{-1} \mathbf{X}^{T} \mathbf{y} \quad\quad$ with $X$ a $N \times (p+1)$ matrix, $y$ a $N \times 1$ vector
 
@@ -476,7 +478,13 @@ crp_lm <- train(crp ~.,
 crp_lm
 ```
 
-As you can see the $R^2$ of this model is still not satisfying at all and the RMSE is also very high: the Root Mean Square Error (RMSE) is a metric that describes the average distance between the predicted values and the real values, which means that a value of RMSE = 9.858278 is very high in the context of gene expression because we are working in logarithmic scale. The reason why this model is so bad is directly told us by caret with a warning message (here suppressed) which says that the model was not able to obtain a lot of $\beta$ coefficients because our predictor variables are correlated and an important assumption of linear regression is the **independence of the predictor variables**. This strong correlation between our variables is expected because they are all genes controlled by our regulator crp so it makes very much sense that they are correlated and it is also one of the reasons of this analysis. In order to remove this multi-collinearity we will try 2 main approaches: **feature selection** and **dimensionality reduction.**
+As you can see the $R^2$ of this model is still not satisfying at all and the RMSE is also very high: the Root Mean Square Error (RMSE) is a metric that describes the average distance between the predicted values and the real values
+
+$$
+RMSE = \sqrt{\dfrac{\sum^{n} _ {i = 1} \big(\hat{y_i} -\bar{y} \big)^2}{n - p}}
+$$
+
+which means that a value of RMSE = 9.858278 is very high in the context of gene expression because we are working in logarithmic scale. The reason why this model is so bad is directly told us by caret with a warning message (here suppressed) which says that the model was not able to obtain a lot of $\beta$ coefficients because our predictor variables are correlated and an important assumption of linear regression is the **independence of the predictor variables**. This strong correlation between our variables is expected because they are all genes controlled by our regulator crp so it makes very much sense that they are correlated and it is also one of the reasons of this analysis. In order to remove this multi-collinearity we will try 2 main approaches: **feature selection** and **dimensionality reduction.**
 
 ### Lasso Regression
 
@@ -504,7 +512,7 @@ crp_lasso <- train(crp ~.,
 crp_lasso
 ```
 
-For the tuning of $\lambda$ we tried powers of 10 from $10^{-5}$ to $10^5$ and as you can see for values greater than $10^{-1}$ the model was not able to correctly converge (caret gave a warning we suppressed) for the same reasons of linear regression discussed before but for smaller values of $\lambda$ they were able to converge and obtain good $R^2$, finally with 10-fold cross-validation (results visually shown with the plot below) we chose $\lambda = 10^{-3}$ as the final hyperparameter and the RMSE of this model is also very acceptable if we think in logarithmic scale in the context of gene expression.
+For the tuning of $\lambda$ we tried powers of 10 from $10^{-5}$ to $10^5$ and as you can see for values greater than $10^{-1}$ the model was not able to correctly converge (caret gave a warning we suppressed) for the same reasons of linear regression discussed before but for smaller values of $\lambda$ they were able to converge and obtain good $R^2$.
 
 ```{r}
 cv_lasso_plot <-  ggplot(data = crp_lasso$results, aes(x = log10(lambda), y = RMSE, group=1)) +
@@ -518,7 +526,7 @@ cv_lasso_plot <-  ggplot(data = crp_lasso$results, aes(x = log10(lambda), y = RM
 cv_lasso_plot
 ```
 
-Let's now take a look to the coefficients of the model
+Finally with 10-fold cross-validation, as you can see from the plot above, we chose $\lambda = 10^{-3}$ as the final hyperparameter and the RMSE of this model is also very acceptable if we think in logarithmic scale in the context of gene expression. Let's now take a look to the coefficients of the model
 
 ```{r}
 plot(crp_lasso$finalModel, xvar = "lambda", xlab= "log(λ)")
