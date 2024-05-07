@@ -1,2 +1,3 @@
 lasso tutorial glmnet: https://daviddalpiaz.github.io/r4sl/regularization.html#lasso
 lasso with nice plots: https://www.datacareer.ch/blog/ridge-and-lasso-in-r/
+random forest explainer: https://cran.rstudio.com/web/packages/randomForestExplainer/vignettes/randomForestExplainer.html

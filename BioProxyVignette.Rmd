@@ -544,11 +544,8 @@ vip(crp_lasso$finalModel, method = "model", num_features = 125)
 
 It is very interesting to note that the first 121 gene coefficients are different from 0 and the remaining 189 gene coefficients are set to 0 by the Lasso procedure (here only 4 shown for simplicity). Let's now look at some of the most important genes and their biological function to see if their importance makes sense:
 
-1)  **sucD**: succinyl-CoA synthetase is a very important enzime in the citric acid cycle, one the most fundamental processes of every living organism thus it enables the survival of the cell. sucD specifically is part of the $\alpha$ subunit which binds CoA and phosphate while the $\beta$ subunit binds the succinate in order to catalize the synthesis of succinyl-CoA. 
-![](img/sucD1.png) 
-From a biological point of view it makes sense that this gene is very important because it is part of a basic biochemical process and in the image above you can see that crp, activated by cAMP, is involved in the transcription of the operon that contains sucD.
-2)  **rpsF**: 30S ribosomal subunit protein S6, as the name says, is a subunit of the ribosome which is the macromolecular complex, composed by rRNA and proteins, involved in the translation of mRNA to protein. ![](img/rpsF.PNG) 
-Again this is a very basic biological process and also involve protein synthesis and we should remember that CRP itself is a protein so it makes much sense that the expression of this gene is able to explain the expression of crp.
+1)  **sucD**: succinyl-CoA synthetase is a very important enzime in the citric acid cycle, one the most fundamental processes of every living organism thus it enables the survival of the cell. sucD specifically is part of the $\alpha$ subunit which binds CoA and phosphate while the $\beta$ subunit binds the succinate in order to catalize the synthesis of succinyl-CoA. ![](img/sucD1.png) From a biological point of view it makes sense that this gene is very important because it is part of a basic biochemical process and in the image above you can see that crp, activated by cAMP, is involved in the transcription of the operon that contains sucD.
+2)  **rpsF**: 30S ribosomal subunit protein S6, as the name says, is a subunit of the ribosome which is the macromolecular complex, composed by rRNA and proteins, involved in the translation of mRNA to protein. ![](img/rpsF.PNG) Again this is a very basic biological process and also involve protein synthesis and we should remember that CRP itself is a protein so it makes much sense that the expression of this gene is able to explain the expression of crp.
 3)  **gatY**: tagatose-1,6-bisphosphate aldolase 2 is important in the process of galactitol degradation, a toxic alcohol which is a subproduct of galactose metabolism. Since galactose is a sugar used in many of the media on which the cultures of *Escherichia coli* are grown it makes sense that a gene involved in the degradation of a toxic compound related to galactose is important for crp, a global transcription factor, because it ensures the global survival of the cell in its environment. ![](img/gatY.PNG){width="600"}
 
 Now we know that Lasso may be a reliable method for the modelling of our targets-regulator relationship but it is heavily dependent on the value of $\lambda$ chosen which might be different for other regulators, when we will analize all the genes we will try to verify this possibility.
@@ -557,25 +554,54 @@ Now we know that Lasso may be a reliable method for the modelling of our targets
 
 ```{r}
 set.seed(123)
+
+# Build tuning grid for Principal Component Regression
+tune_grid_pcr <- expand.grid(ncomp = 1:((ncol(crp_full) - 1) %/% 2))
+
 crp_pca <- train(crp ~., 
                  data = crp_full, 
-                 method = "lm",
+                 method = "pcr",
                  trControl = fit_control,
-                 preProcess = c("center", "scale", "pca"))
+                 preProcess = c("center", "scale", "zv"),
+                 tuneGrid = tune_grid_pcr)
 
 crp_pca
 ```
 
-### Regression Tree
+```{r, fig.width = 12, fig.height = 5}
+cv_pcr_plot <-  ggplot(data = crp_pca$results, aes(x = ncomp, y = RMSE, group=1)) +
+                ggtitle("Principal Component Regression Cross-Validation Results") +
+                theme(plot.title = element_text(hjust = 0.5)) +
+                xlab("Number of Components") + 
+                ylab("RMSE (Repeated Cross-Validation)") + 
+                geom_line(color="blue")+
+                geom_point()
+
+cv_pcr_plot
+```
+
+```{r, fig.width = 9, fig.height = 16}
+vip(crp_pca$finalModel, method = "model", num_features = 125)
+```
+
+### Decision Tree and Random Forest
+
+Decision Trees are among the most commonly used algorithms in machine learning for regression and classification and they work by dividing the predictor space $X_1, X_2, \dots, X_p$ in $J$ distinct and non-overlapping regions $R_1, R_2, \dots, R_J$ then for each test observation that falls in a region $R_j$ we make the same prediction which is the average of all the training observations that fall in that region. In a beautiful world we would like to divide the space in regions which minimizes the Residual Sum of Squares
+
+$$
+RSS = \sum^n _ {j=1}\sum _ {i \in R_j}(y_i - \hat{y}_{R_j})^2
+$$
+
+where $\hat{y}_{R_j}$ is the average response of the partition, the problem is that this approach is computationally impossible because it would need to try all the partitions and for this reason the actual way to partition the space is through the **recursive binary division** which is a top-down and greedy algorithm. The algorithm starts from the top of the tree then it starts doing binary divisions and each produces two new lower branches, the algorithm is greedy because at each step the best division is done only considering the current step instead of looking forward for better divisions. Once we have our regions $R_1, \dots, R_J$ we predict their response by taking the average of training observations falling in each region. This procedure may be good at fitting the training data, in fact too good because over-fitting is a serious issue of this approach. The reason of over-fitting is that the final tree may be extremely complex so our aim is now to prune the tree in order to have a smaller one which is more effective on unseen data. The most intuitive approach would be to cross-validate the error of each sub-tree but this is nearly impossible in terms of computational cost so we use the **cost complexity pruning**: we basically build a full tree that stops growing when a terminal leaf has less than a set number of observation than we find the tree which minimizes the following function
+
+$$
+\sum^{|T|} _ {m=1}\sum _ {i: x_i \in R_m}(y_i - \hat{y}_{R_m})^2 + \alpha|T|
+$$
+
+where $\alpha$ is a tuning hyperparameter which decides the cost complexity of the tree and $T$ is the number of terminal leaf of a specific tree, in this way we can use cross-validation to find the optimal value of $\alpha$. This formulation is indeed very similar to the Lasso regularization discussed before and in the same way if $\alpha = 0$ the tree is the unpruned tree. Let's now fit a regression tree and look for the optimal value of $\alpha$, here called ***cp*** which stands for cost complexity.
 
 ```{r}
 set.seed(123)
-# Cross-validation for regression trees
-fit_control_tree <- trainControl(
-  method = "repeatedcv",
-  number = 10,
-  repeats = 10,
-  savePredictions = "final")
 
 # Setup tuning grid for Regression Trees
 tune_grid_tree <-  expand.grid(cp = seq(from = 0, to = 0.1, by = 0.01))
@@ -584,15 +610,50 @@ tune_grid_tree <-  expand.grid(cp = seq(from = 0, to = 0.1, by = 0.01))
 crp_tree <- train(crp ~., 
                   data = crp_full,
                   method = "rpart",
-                  trControl = fit_control_tree,
+                  trControl = fit_control,
                   tuneGrid = tune_grid_tree)
 crp_tree
 ```
 
-```{r}
-print(crp_tree$finalModel)
+We got a final cp value of 0.02, which is indeed the value with the lowest RMSE as you can see from the plot below, the issue is that we got a somewhat unsatisfying result if we look at the $R^2$ of the model.
+
+```{r, fig.width = 12, fig.height = 5}
+cv_tree_plot <-  ggplot(data = crp_tree$results, aes(x = cp, y = RMSE, group=1)) +
+                 ggtitle("Regression Tree Cross-Validation Results") +
+                 theme(plot.title = element_text(hjust = 0.5)) +
+                 xlab("Cost Complexity") + 
+                 ylab("RMSE (Repeated Cross-Validation)") + 
+                 geom_line(color="blue")+
+                 geom_point()
+
+cv_tree_plot
 ```
 
+Let's now look at the divisions made during the procedure.
+
+```{r}
+crp_tree$finalModel
+```
+
+It is pretty hard to understand what is happening here so we can now visualize the tree in a nice way using the **rattle** package in order to have a more human readable result.
+
 ```{r, fig.width = 12, fig.height = 12}
-fancyRpartPlot(crp_tree$finalModel, sub = "")
+fancyRpartPlot(crp_tree$finalModel, sub = "", palettes = "Oranges")
+```
+
+As you can see the root node starts by predicting the expression value of crp as 10.083130, then at each division it refines the response value. The first division is done by looking at the expression of the gene **ascB** that encodes for the phospho-β-glucosidase which basically hydrolizes the bond between D-glucose and D-glucose 6-phospate. The latter is the product of glycolysis first reaction which is the starting point of the oxidation of glucose for the production of ATP. ![](img/ascB.PNG){width="665"} As you can see ascB is regulated by CRP when cAMP binds CRP activating it. If we get more D-glucose 6-phospate in the system we have more ATP and less cAMP which means that the activity of CRP should be lower; one important feature of CRP is that it *negatively autoregulates* itself, so it makes sense that for lower levels of ascB we have lower expression values of crp because there is less D-glucose 6-phospate and more cAMP in the cell which makes CRP more active which negatively autoregulates itself lowering. Even if this first decision makes sense it is probably better to try a more robust model, which is called **random forest**.
+
+```{r}
+set.seed(123)
+
+# Setup tuning grid for Random Forest
+tune_grid_forest <-  expand.grid(.mtry = sqrt(ncol(crp_full) - 1))
+
+# Training Regression Tree
+crp_forest <- train(crp ~., 
+                  data = crp_full,
+                  method = "rf",
+                  trControl = fit_control,
+                  tuneGrid = tune_grid_forest)
+crp_forest
 ```
