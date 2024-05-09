@@ -658,7 +658,8 @@ crp_forest <- train(crp ~.,
                   tuneGrid = tune_grid_forest)
 crp_forest
 ```
-As you can see the cross-validation $R^2$ and RMSE of this model is fully comparable to the linear regression methods we used before and random forest is known to be highly accurate and powerful and also as easy to interpret as linear regression. To look at the results we could sample a random tree out of the forest and visualize it as before but we may get the same bias so it is better to look at the distribution of the **minimal depth** that is the average distance between the root of a tree and the node/split where a given gene was used.
+
+As you can see the cross-validation $R^2$ and RMSE of this model is fully comparable to the linear regression methods we used before and random forest is known to be highly accurate and powerful and also as easy to interpret as linear regression. To look at the results we could sample a random tree out of the forest and visualize it as before but we may get the same bias so it is better to look at the distribution of the **minimal depth** that is the distance between the root of a tree and the node/split where a given gene was used.
 
 ```{r}
 # compute all the minimal depths of each gene
@@ -667,6 +668,5 @@ min_depth_frame <- min_depth_distribution(crp_forest$finalModel)
 # Plot the results
 plot_min_depth_distribution(min_depth_frame, k = 15)
 ```
-This beautiful plot has on the x-axis the total number of trees and on the y-axis the genes we are considering, each color represents a depth value and the length of the colored box how many trees have that depth value for the considered gene. The plot also tells us the minimal depth for each gene by taking the average depth for that gene across all the trees. We chose to show only the top 15 genes by minimal depth because a *lower value of minimal depth tells how important for the model the gene is*.
-As you can see many of the target genes we discussed before like rpsF, galY, ascB are shown here and now we have multiple confirmations that these genes can be used as a proxy for the activity of crp. 
-In conclusion random forest is a very reliable model for genes that have an high number of interactions but it is not as good for regulators that have a lower number of target genes because we would have much less options for tree splitting. 
+
+This beautiful plot has on the x-axis the total number of trees and on the y-axis the genes we are considering, each color represents a depth value and the length of the colored box how many trees have that depth value for the considered gene. The plot also tells us the average minimal depth for that gene across all the trees. We chose to show only the top 15 genes by average minimal depth because a *lower value of average minimal depth tells how important for the model the gene is*. As you can see many of the target genes we discussed before like rpsF, galY, ascB are shown here and now we have multiple confirmations that these genes can be used as a proxy for the activity of crp. In conclusion random forest is a very reliable model for genes that have an high number of interactions but it is not as good for regulators that have a lower number of target genes because we would have much less options for tree splitting.
