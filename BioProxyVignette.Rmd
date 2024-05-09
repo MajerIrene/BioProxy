@@ -44,6 +44,7 @@ library(igraph)
 library(vip)
 library(ggrepel)
 library(rattle)
+library(randomForestExplainer)
 ```
 
 # Pre-processing
@@ -598,7 +599,7 @@ $$
 \sum^{|T|} _ {m=1}\sum _ {i: x_i \in R_m}(y_i - \hat{y}_{R_m})^2 + \alpha|T|
 $$
 
-where $\alpha$ is a tuning hyperparameter which decides the cost complexity of the tree and $T$ is the number of terminal leaf of a specific tree, in this way we can use cross-validation to find the optimal value of $\alpha$. This formulation is indeed very similar to the Lasso regularization discussed before and in the same way if $\alpha = 0$ the tree is the unpruned tree. Let's now fit a regression tree and look for the optimal value of $\alpha$, here called ***cp*** which stands for cost complexity.
+where $\alpha$ is a tuning hyperparameter which decides the cost complexity of the tree and $T$ is the number of terminal leaves of a specific tree, in this way we can use cross-validation to find the optimal value of $\alpha$. This formulation is indeed very similar to the Lasso regularization discussed before and in the same way if $\alpha = 0$ the tree is the unpruned tree. Let's now fit a regression tree and look for the optimal value of $\alpha$, here called ***cp*** which stands for cost complexity.
 
 ```{r}
 set.seed(123)
@@ -641,12 +642,12 @@ It is pretty hard to understand what is happening here so we can now visualize t
 fancyRpartPlot(crp_tree$finalModel, sub = "", palettes = "Oranges")
 ```
 
-As you can see the root node starts by predicting the expression value of crp as 10.083130, then at each division it refines the response value. The first division is done by looking at the expression of the gene **ascB** that encodes for the phospho-β-glucosidase which basically hydrolizes the bond between D-glucose and D-glucose 6-phospate. The latter is the product of glycolysis first reaction which is the starting point of the oxidation of glucose for the production of ATP. ![](img/ascB.PNG){width="665"} As you can see ascB is regulated by CRP when cAMP binds CRP activating it. If we get more D-glucose 6-phospate in the system we have more ATP and less cAMP which means that the activity of CRP should be lower; one important feature of CRP is that it *negatively autoregulates* itself, so it makes sense that for lower levels of ascB we have lower expression values of crp because there is less D-glucose 6-phospate and more cAMP in the cell which makes CRP more active which negatively autoregulates itself lowering. Even if this first decision makes sense it is probably better to try a more robust model, which is called **random forest**.
+As you can see the root node starts by predicting the expression value of crp as 10.083130, then at each division it refines the response value. The first division is done by looking at the expression of the gene **ascB** that encodes for the phospho-β-glucosidase which basically hydrolizes the bond between D-glucose and D-glucose 6-phospate. The latter is the product of glycolysis first reaction which is the starting point of the oxidation of glucose for the production of ATP. ![](img/ascB.PNG){width="665"} As you can see ascB is regulated by CRP when cAMP binds CRP activating it. If we get more D-glucose 6-phospate in the system we have more ATP and less cAMP which means that the activity of CRP should be lower; one important feature of CRP is that it *negatively autoregulates* itself, so it makes sense that for lower levels of ascB we have lower expression values of crp because there is less D-glucose 6-phospate and more cAMP in the cell which makes CRP more active which negatively autoregulates itself. Even if this first decision makes sense it is probably better to try a more robust method because decision trees are very easy to explain but not very accurate. **Random Forest** is a more sophisticated version of decision trees, in fact the rationale is to build many different decision trees (by default caret build 500 trees) and take as the final prediction the average response of them. Many different random trees are built and each one of them only use a random subset of all the possible predictors; this subset has a length $m$ where the most used value is $m = \sqrt{p}$, in this way we obtain many smaller trees that uses only a very small portion of the predictors for their divisions. Then it applies methods to decorrelate the trees and finally it takes the average of all the responses of this "random forest".
 
 ```{r}
 set.seed(123)
 
-# Setup tuning grid for Random Forest
+# Setup tuning grid for Random Forest, m value is sqrt of the predictors.
 tune_grid_forest <-  expand.grid(.mtry = sqrt(ncol(crp_full) - 1))
 
 # Training Regression Tree
@@ -657,3 +658,15 @@ crp_forest <- train(crp ~.,
                   tuneGrid = tune_grid_forest)
 crp_forest
 ```
+As you can see the cross-validation $R^2$ and RMSE of this model is fully comparable to the linear regression methods we used before and random forest is known to be highly accurate and powerful and also as easy to interpret as linear regression. To look at the results we could sample a random tree out of the forest and visualize it as before but we may get the same bias so it is better to look at the distribution of the **minimal depth** that is the average distance between the root of a tree and the node/split where a given gene was used.
+
+```{r}
+# compute all the minimal depths of each gene
+min_depth_frame <- min_depth_distribution(crp_forest$finalModel)
+
+# Plot the results
+plot_min_depth_distribution(min_depth_frame, k = 15)
+```
+This beautiful plot has on the x-axis the total number of trees and on the y-axis the genes we are considering, each color represents a depth value and the length of the colored box how many trees have that depth value for the considered gene. The plot also tells us the minimal depth for each gene by taking the average depth for that gene across all the trees. We chose to show only the top 15 genes by minimal depth because a *lower value of minimal depth tells how important for the model the gene is*.
+As you can see many of the target genes we discussed before like rpsF, galY, ascB are shown here and now we have multiple confirmations that these genes can be used as a proxy for the activity of crp. 
+In conclusion random forest is a very reliable model for genes that have an high number of interactions but it is not as good for regulators that have a lower number of target genes because we would have much less options for tree splitting. 
