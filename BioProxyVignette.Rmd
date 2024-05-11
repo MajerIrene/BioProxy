@@ -39,6 +39,7 @@ library(ggplot2)
 library(grid)
 library(gridExtra)
 library(caret)
+library(pls)
 library(glmnet)
 library(igraph)
 library(vip)
@@ -546,7 +547,7 @@ vip(crp_lasso$finalModel, method = "model", num_features = 125)
 It is very interesting to note that the first 121 gene coefficients are different from 0 and the remaining 189 gene coefficients are set to 0 by the Lasso procedure (here only 4 shown for simplicity). Let's now look at some of the most important genes and their biological function to see if their importance makes sense:
 
 1)  **sucD**: succinyl-CoA synthetase is a very important enzime in the citric acid cycle, one the most fundamental processes of every living organism thus it enables the survival of the cell. sucD specifically is part of the $\alpha$ subunit which binds CoA and phosphate while the $\beta$ subunit binds the succinate in order to catalize the synthesis of succinyl-CoA. ![](img/sucD1.png) From a biological point of view it makes sense that this gene is very important because it is part of a basic biochemical process and in the image above you can see that crp, activated by cAMP, is involved in the transcription of the operon that contains sucD.
-2)  **rpsF**: 30S ribosomal subunit protein S6, as the name says, is a subunit of the ribosome which is the macromolecular complex, composed by rRNA and proteins, involved in the translation of mRNA to protein. ![](img/rpsF.PNG) Again this is a very basic biological process and also involve protein synthesis and we should remember that CRP itself is a protein so it makes much sense that the expression of this gene is able to explain the expression of crp.
+2)  **rpsF**: 30S ribosomal subunit protein S6, as the name says, is a part of the 30S subunit of the ribosome which is the macromolecular complex, composed by rRNA and proteins, involved in the translation of mRNA to protein. ![](img/rpsF.PNG) Again this is a very basic biological process and also involve protein synthesis and we should remember that CRP itself is a protein so it makes much sense that the expression of this gene is able to explain the expression of crp.
 3)  **gatY**: tagatose-1,6-bisphosphate aldolase 2 is important in the process of galactitol degradation, a toxic alcohol which is a subproduct of galactose metabolism. Since galactose is a sugar used in many of the media on which the cultures of *Escherichia coli* are grown it makes sense that a gene involved in the degradation of a toxic compound related to galactose is important for crp, a global transcription factor, because it ensures the global survival of the cell in its environment. ![](img/gatY.PNG){width="600"}
 
 Now we know that Lasso may be a reliable method for the modelling of our targets-regulator relationship but it is heavily dependent on the value of $\lambda$ chosen which might be different for other regulators, when we will analize all the genes we will try to verify this possibility.
@@ -636,7 +637,7 @@ Let's now look at the divisions made during the procedure.
 crp_tree$finalModel
 ```
 
-It is pretty hard to understand what is happening here so we can now visualize the tree in a nice way using the **rattle** package in order to have a more human readable result.
+It is pretty hard to understand what is happening here so we can now visualize the tree in a nice way using the **rattle package** in order to have a more human readable result.
 
 ```{r, fig.width = 12, fig.height = 12}
 fancyRpartPlot(crp_tree$finalModel, sub = "", palettes = "Oranges")
@@ -650,12 +651,13 @@ set.seed(123)
 # Setup tuning grid for Random Forest, m value is sqrt of the predictors.
 tune_grid_forest <-  expand.grid(.mtry = sqrt(ncol(crp_full) - 1))
 
-# Training Regression Tree
+# Training Random Forest
 crp_forest <- train(crp ~., 
                   data = crp_full,
                   method = "rf",
                   trControl = fit_control,
-                  tuneGrid = tune_grid_forest)
+                  tuneGrid = tune_grid_forest,
+                  localImp = TRUE)
 crp_forest
 ```
 
@@ -666,7 +668,27 @@ As you can see the cross-validation $R^2$ and RMSE of this model is fully compar
 min_depth_frame <- min_depth_distribution(crp_forest$finalModel)
 
 # Plot the results
-plot_min_depth_distribution(min_depth_frame, k = 15)
+plot_min_depth_distribution(min_depth_frame, mean_sample = "all_trees", k = 15)
 ```
 
-This beautiful plot has on the x-axis the total number of trees and on the y-axis the genes we are considering, each color represents a depth value and the length of the colored box how many trees have that depth value for the considered gene. The plot also tells us the average minimal depth for that gene across all the trees. We chose to show only the top 15 genes by average minimal depth because a *lower value of average minimal depth tells how important for the model the gene is*. As you can see many of the target genes we discussed before like rpsF, galY, ascB are shown here and now we have multiple confirmations that these genes can be used as a proxy for the activity of crp. In conclusion random forest is a very reliable model for genes that have an high number of interactions but it is not as good for regulators that have a lower number of target genes because we would have much less options for tree splitting.
+This beautiful plot has on the x-axis the total number of trees and on the y-axis the genes we are considering, each color represents a depth value and the length of the colored box how many trees have that depth value for the considered gene. The plot also tells us the average minimal depth for that gene across all the trees. We chose to show only the top 15 genes by average minimal depth because a *lower value of average minimal depth tells how important for the model the gene is*. As you can see many of the target genes we discussed before like rpsF, galY, ascB are shown here and now we have multiple confirmations that these genes can be used as a proxy for the activity of crp. Now we can look more in detail at the genes interaction of this model to see if they make sense, firstly we take the top 5 genes by importance considering both their mean minimal depth and the number of trees in which they appear the we use this information to get the interaction plot.
+
+```{r, warning = FALSE}
+# Get the top 5 genes
+forest_genes <- important_variables(crp_forest$finalModel, k = 5, measures = c("mean_min_depth", "no_of_trees"))
+
+# Compute their interactions
+interactions_frame <- min_depth_interactions(crp_forest$finalModel, forest_genes)
+
+# Plot the interactions
+plot_min_depth_interactions(interactions_frame)
+```
+
+In this plot the interactions are ranked by the number of occurrences, defined by the color, while on the y-axis you see the value of the mean minimal depth. Remember that these are interactions according to the random forest model and not strictly in the biological sense so they don't necessarily have a biological meaning but we will still try to make sense of them if possible.
+
+1)  **glpQ:glpQ**: GlpQ is a periplasmic protein that catalyzes the hydrolysis of glycerophosphodiesters into glycerol-P and an alcohol. The glycerol-P is then transported into the cell by the glycerol-P transporter, GlpT. As you can see from the chart below this self-interaction is explainable by the fact the glpQ is controlled by glpR which is activated by glicerol. ![](img/glpQ-glpQ.PNG){width="665"}
+2)  **gspA:chbA**: gspA is part of a cluster of genes that encodes the components of a type II secretion system, an important protein of the outer-membrane of *E. coli* which is a gram negative species. The interesting thing is that N-acetyl-glucosamine is a primary component of the peptidoglycan layer which is under the outer-membrane and you can see in the picture that it is involved in the regulation of chbA through ChbR along with CRP and other transcription factors. ![](img/chbA.PNG){width="665"} Even if we are not fully able to explain this interaction it makes some sense because these genes are functionally related in some way, this fact makes evident the complexity of biological interactions.
+3)  **gspA:idnK**: idnK is a thermosensitive D-gluconate kinase, D-gluconate 6-phospate is an intermediate of the pentose phospate pathway. This biochemical process is not directly related to outer-membrane secretion and for this reason the interaction with gspA is probably due to the common regulation by CRP instead of some common biological function.
+4)  **gspA:glpQ**: as we said before GlpQ is a periplasmic protein and gspA is part of type II secretion system which secretes folded proteins from the periplasm to outside world, as we said for the gspA:chbA interaction there is some functional correlation but we are not able to fully make sense of it.
+
+In conclusion random forest is a very reliable model for genes that have an high number of targets but it is not as good for regulators that have a lower number of target genes because we would have much less options for tree splitting.
