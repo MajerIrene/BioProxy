@@ -147,14 +147,14 @@ log_tpm <- t(log_tpm)
 We would like to verify if we can use one the four major summary statistics which are **mean**, **median**, **maximum** and **minimum** of expression of each gene to model the *relationship between the targets and their regulator*. Now let's analyze the distribution of these statistics to understand which is the best value to choose, if any, then we also want check if they follow a **Gaussian distribution** using the Shapiro--Wilk test which computes the W statistics as follows:
 
 $$
-W = \dfrac{\big(\sum^n _ {i=1} a_i x_{(i)} \big ) ^2}{\sum^n _ {i=1} (x_i - \bar{x})^2}
+\large W = \dfrac{\big(\sum^n _ {i=1} a_i x_{(i)} \big ) ^2}{\sum^n _ {i=1} (x_i - \bar{x})^2}
 $$
 
 Then this W value is used for the hypothesis testing that follows:
 
 $$
-H_o: \text{a sample } x_1, \cdots, x_n \text{ is drawn from a normally distributed population.} \\
-H_a: \text{a sample } x_1, \cdots, x_n \text{ is not drawn from a normally distributed population.}
+ \large H_o: \text{a sample } x_1, \cdots, x_n \text{ is drawn from a normally distributed population.} \\
+\large H_a: \text{a sample } x_1, \cdots, x_n \text{ is not drawn from a normally distributed population.}
 $$
 
 If the test returns a *p-value* lower then the threshold 0.05 it means that the data **do not** follow a normal distribution.
@@ -223,9 +223,10 @@ shapiro.test(log_tpm_min$value) #not gaussian
 ```
 
 Based on the results of the Shapiro-Wilk tests conducted on the four distributions and their respective histograms, we can conclude that the distributions do not follow to a Gaussian (normal) distribution.\
-Consequently, this implies that choosing measures such as the mean, median, maximum, or minimum may not match the linear regression assumption that the data follows a Gaussian (normal) distribution, for this reason it is not possible to use one of these statistics as a predictor in our model because none of them is normally distributed but the biggest problem is that we would train a model on a single sample and it does not make any sense. In the next section about modelling we will try instead to take the mean of all the targets in every condition and fit a model with 1 feature (mean of the targets) and as many samples as the conditions that we have.
 
-Now we plot some histograms to have a better idea on the number of positive, negative and total interactions of each regulator and again we perform a Shapiro--Wilk test for each one of them to check for normality.
+*Consequently, this implies that choosing measures such as the mean, median, maximum, or minimum may not match the linear regression assumption that the data follows a Gaussian (normal) distribution, for this reason it is not possible to use one of these statistics as a predictor in our model because none of them is normally distributed but the biggest problem is that we would train a model on a single sample and it does not make any sense. In the next section about modelling we will try instead to take the mean of all the targets in every condition and fit a model with 1 feature (mean of the targets) and as many samples as the conditions that we have.*
+
+Now we plot some histograms to have a better idea on the number of positive, negative and total interactions of each regulator:
 
 ```{r, fig.width = 12, fig.height = 9}
 # Divide positive and negative regulation
@@ -289,18 +290,7 @@ total_counts_hist <- ggplot(total_counts, aes(x = value)) +
 grid.arrange(pos_counts_hist, neg_counts_hist, total_counts_hist, ncol = 1)
 ```
 
-```{r}
-# Positive Interactions Counts normality test
-shapiro.test(pos_counts$value) #not gaussian
-
-# Negative Interactions Counts normality test
-shapiro.test(neg_counts$value) #not gaussian
-
-# Total Interactions Counts normality test
-shapiro.test(total_counts$value) #not gaussian
-```
-
-These histograms show how many genes are regulated by how many regulators, the horizontal axis indicates how many genes are controlled by the regulator and the vertical axis indicates how many regulators have that number of interactions; for example there are more than 150 regulators that positively interact with 0 genes, this is not surprising because we removed weak and unknown interactions and we can also see that there is a gene that negatively controls a number of genes close to 400. There are slightly more negative regulators that interact with at least one gene then positive. In addition we observe that majority of genes does not interact with other genes but there are some exceptions like the gene **crp** which positively interacts with 310 other genes. We can also note that none of these is normally distributed.
+These histograms show how many genes are regulated by how many regulators, the horizontal axis indicates how many genes are controlled by the regulator and the vertical axis indicates how many regulators have that number of interactions; for example there are more than 150 regulators that positively interact with 0 genes, this is not surprising because we removed weak and unknown interactions and we can also see that there is a gene that negatively controls a number of genes close to 400. There are slightly more negative regulators that interact with at least one gene then positive. In addition we observe that majority of genes does not interact with other genes but there are some exceptions like the gene **crp** which positively interacts with 310 other genes.
 
 ### Network analysis
 
@@ -317,13 +307,18 @@ plot.igraph(graph, layout=layout, vertex.label=NA, vertex.size=3, edge.arrow.siz
 
 ```
 
++++
+
 # Modelling
 
-In order to find a mathematical model able to describe the complexity of this biological problem we would like to start with simpler cases and look for what might be the best approach for them then we will apply this approach to each regulator. For this reason we will individually perform the modelling on the positive interactions of 2 genes to see which model can be suitable to be applied to all the genes; We chose the genes **crp** and **gene da scegliere**
+In order to find a mathematical model able to describe the complexity of this biological problem we would like to start with a specific case and look for what might be the best approach for it. Then we will apply this approach to each regulator.\
+We chose the gene **crp** because it is the positive regulator with the most targets, therefore it can be interesting to use it as a test case.\
+After choosing the best approach, we will apply it to all the other regulators.
 
 ## cAMP Receptor Protein (crp) {#camp-receptor-protein-crp}
 
-The protein CRP is a **global transcription regulator**, which plays a major role in carbon catabolite repression (CCR) as well as other processes because it can act as an activator, repressor, coactivator or corepressor. CRP binds cyclic AMP (cAMP) which allosterically activates it, this means that its activity should not be influenced by the activity of any kinase, then it binds to its DNA binding site to directly regulate the transcription of about 300 genes in about 200 operons and indirectly regulate the expression of about half the genome.
+The protein CRP is a **global transcription regulator**, which plays a major role in carbon catabolite repression (CCR) as well as other processes, because it can act as an activator, repressor, coactivator or corepressor.\
+CRP binds cyclic AMP (cAMP) which allosterically activates it, this means that its activity should not be influenced by the activity of any kinase. Then it binds to its DNA binding site to directly regulate the transcription of about 300 genes in about 200 operons and indirectly regulate the expression of about half the genome.
 
 ### Simple Linear Regression
 
@@ -351,11 +346,19 @@ crp_mean_train <- data.frame(crp = unlist(crp_exp),
                              targets = unlist(crp_target_mean_conditions))
 ```
 
-All the models that we will fit in this project will be validated with **10-fold cross-validation**, cross-validation is a simple and widely used sampling technique for estimating prediction error to assess how the model would act against unseen data. It is often done when there is not enough data to set aside a validation set and it has many advantages like preventing overfitting by providing a more robust estimate of the model's performances and allowing model selection and hyperparameter tuning while being at the same time data efficient because all the data is used for training and testing the model. In the case of linear regression the purpose of cross-validation is only to get a robust estimate of the performances but in the next sections we will try to use it for model selection and hyperparameter tuning. The rationale of 10-fold cross-validation is very simple because it divides the dataset in 10 folds then it uses 9 for training and the last one for testing, this procedure is repeated other 9 times by changing the testing fold and by using the remaining ones for training.
+All the models that we will fit in this project will be validated with **10-fold cross-validation**.\
+Cross-validation is a simple and widely used sampling technique for estimating prediction error to assess how the model would act against unseen data. It is often done when there is not enough data to set aside a validation set.\
+It has many advantages like preventing over-fitting by providing a more robust estimate of the model's performances; it also allows model selection and hyperparameter tuning while being at the same time data efficient, because all the data is used for training and testing the model.
+
+In the case of linear regression the purpose of cross-validation is only to get a robust estimate of the performances. In the next sections we will try to use it for model selection and hyperparameter tuning.
+
+The rationale of 10-fold cross-validation is very simple because it divides the dataset in 10 folds then it uses 9 for training and the last one for testing. This procedure is repeated other 9 times by changing the testing fold and by using the remaining ones for training.
 
 ![](img/10-foldcv.png)
 
-As you can see from the picture above at every iteration the procedure computes an error metric and at the end it will take the average of all the metrics to gave us a more robust estimate of real testing error. The **caret package** is the R equivalent of Python scikit-learn and it allows to very easily set up the training of Machine Learning models and it also provide a very nice way to set-up a cross-validation in order to have more reliable models!
+As you can see from the picture above at every iteration the procedure computes an error metric and at the end it will take the average of all the metrics to gave us a more robust estimate of real testing error.
+
+The **caret package** is the R equivalent of Python scikit-learn and it allows to very easily set up the training of Machine Learning models and it also provide a very nice way to set-up a cross-validation in order to have more reliable models!
 
 ```{r}
 ## 10-fold CV
@@ -366,24 +369,24 @@ fit_control <- trainControl(
   repeats = 10)
 ```
 
-Let's get back to linear regression, using one feature we are in a setting for the use of **simple linear regression** which is a model that assumes that there is a linear relationship between $X$ and $Y$, in this case $Y$ is the expression of our regulator crp and $X$ is the mean of all its targets. The relationship between $X$ and $Y$ is modelled as follows:
+Let's get back to linear regression. Using one feature we are in the setting of **simple linear regression** which is a model that assumes that there is a linear relationship between $X$ and $Y$. In this case $Y$ is the expression of our regulator crp and $X$ is the mean of all its targets. The relationship between $X$ and $Y$ is modeled as follows:
 
-$$Y \approx \beta_0 + \beta_1 X$$
+$$\large Y \approx \beta_0 + \beta_1 X$$
 
 To find a solution for this problem the **Least Squares Method** is employed: we know that $\hat{y_i} = \hat{\beta_0} + \hat{\beta_1}x_i$ is a prediction from our model and $e_i = y_i - \hat{y_i}$ is the residual error, that is the difference between the actual value $y_i$ and the predicted one $\hat{y_i}$.\
 Least squares finds a solution that minimizes the residual sum of squares of all training data, RSS.
 
 $$
-RSS = e_1^2 + e_2^2 + \dots + e_N^2 = \sum_i (y_i - \hat{y_i})^2 = \sum_{i=1}^N (y_i - \hat{\beta_0} - \hat{\beta_1}x_i)^2
+\large RSS = e_1^2 + e_2^2 + \dots + e_N^2 = \sum_i (y_i - \hat{y_i})^2 = \sum_{i=1}^N (y_i - \hat{\beta_0} - \hat{\beta_1}x_i)^2
 $$
 
 Now we compute the partial derivatives of RSS with respect to the model parameters $\hat{\beta_0}$ and $\hat{\beta_1}$ and equate them to 0. The RSS function is **globally convex**, meaning that there exist a single stationary point which is a minimum for this reason we don't need to compute the second derivative to find the global minumun and we can directly solve the equations obtained before with respect to the parameters in this way:
 
-$$\hat{\beta}_{1}=\frac{\sum_{i=1}^{n}\left(x_{i}-\overline{x}\right)\left(y_{i}-\overline{y}\right)}{\sum_{i=1}^{n}\left(x_{i}-\overline{x}\right)^{2}} \quad\quad$$ $$\hat{\beta}_{0}=\overline{y}-\hat{\beta}_{1} \overline{x}$$
+$$\large \hat{\beta}_{1}=\frac{\sum_{i=1}^{n}\left(x_{i}-\overline{x}\right)\left(y_{i}-\overline{y}\right)}{\sum_{i=1}^{n}\left(x_{i}-\overline{x}\right)^{2}} \quad\quad$$ $$\large \hat{\beta}_{0}=\overline{y}-\hat{\beta}_{1} \overline{x}$$
 
 where $\bar{x}$ is the mean of the means of expression of crp targets in all the conditions and $\bar{y}$ is the mean expression of crp.
 
-As anticipated before the fitting of linear regression with 10-fold cross-validation with caret can be achieved in a very simple way and with few lines of code
+As anticipated before, the fitting of linear regression with 10-fold cross-validation with caret can be achieved in a very simple way and with few lines of code
 
 ```{r}
 #cv is a random procedure so we set a random seed for reproducibility
@@ -396,13 +399,14 @@ crp_lm_mean <- train(crp ~ targets,
 crp_lm_mean
 ```
 
-The coefficient of determination, or $R^2$, is a measure that provides information about the goodness of fit of a model. In other word it is a value that tells us about the variance of the data explained by the model, it is computed using the following formula.
+The coefficient of determination, or $R^2$, is a measure that provides information about the goodness of fit of a model. In other word it is a value that tells us about the variance of the data explained by the model.\
+It is computed using the following formula:
 
 $$
-R^2 = \dfrac{\sum^{n} _ {i = 1} \big(\hat{y_i} -\bar{y} \big)^2}{\sum^n _ {i = 1} (y_i -\bar{y})^2}
+\large R^2 = \dfrac{\sum^{n} _ {i = 1} \big(\hat{y_i} -\bar{y} \big)^2}{\sum^n _ {i = 1} (y_i -\bar{y})^2}
 $$
 
-$R^2$ values close to 1 tell us that the model is able to explain almost 100% of the variance of the data indicating that the model fitted very well the data and values close to 0 tell the opposite, in this case we got an $R^2$ = 0.03536782 which is a very low value and this means that the regression was not able to model the expression of the gene crp using the mean of its target. This result can be further explained by looking if some assumption of linear regression was not matched, more in detail we will now look for homoschedasticity and normality of the residuals.
+$R^2$ values close to 1 tell us that the model is able to explain almost 100% of the variance of the data indicating that the model fitted very well the data and values close to 0 tell the opposite. In this case we got an $R^2$ = 0.03536782 which is a very low value; this means that the regression was not able to model the expression of the gene crp using the mean of its target. This result can be further explained by looking if some assumption of linear regression was not matched, more in detail we will now look for homoschedasticity and normality of the residuals.
 
 ```{r, fig.width = 12, fig.height = 5}
 # scatterplot of the data with the regression line
@@ -434,7 +438,10 @@ crp_lm_mean_residuals <-  ggplot(crp_res, aes(x = fitted.values, y = residuals))
 grid.arrange(crp_lm_mean_scatterplot, crp_lm_mean_residuals, nrow = 1)
 ```
 
-On the left you can see the scatterplot of the targets mean in each condition as the independent variable and the value of expression of crp in $log(TPM)$ as the dependent variable with the regression line predicted by the model above drawn; on the right you can see the scatterplots of the residuals and we can notice just by looking that one assumption of linear regression is not matched: the variance of the residuals is not constant which means that the **homeschedasticity of the residuals** assumption is not met. Now let's look for the normality of the residuals.
+On the left you can see the scatterplot of the targets mean in each condition as the independent variable and the value of expression of crp in $log(TPM)$ as the dependent variable with the regression line predicted by the model above drawn.\
+On the right you can see the scatterplots of the residuals and we can notice just by looking that one assumption of linear regression is not matched: the variance of the residuals is not constant which means that the **homeschedasticity of the residuals** assumption is not met.
+
+Now let's look for the normality of the residuals.
 
 ```{r, fig.width = 12, fig.height = 5}
 crp_lm_mean_qq <- ggplot(crp_res, aes(sample=residuals)) +
@@ -451,19 +458,23 @@ crp_lm_mean_qq
 shapiro.test(crp_res$residuals)
 ```
 
-By looking at the QQ-plot we can see that the points are on the line for the most part but they are skewed at the tails and considering a p-value threshold of 0.05 for the normality test we can confidently say that the residuals are **not normally distributed**: another important assumption of linear regression is not matched. Considering all the elements discussed before we conclude that this simplicistic model is not able to describe the complex relationship between a regulator and its targets.
+By looking at the QQ-plot we can see that the majority of the points are on the line, but they are skewed at the tails. Considering a p-value threshold of 0.05 for the normality test we can confidently say that the residuals are **not normally distributed**: so another important assumption of linear regression is not matched. Considering all the elements discussed before we conclude that this simple model is not able to describe the complex relationship between a regulator and its targets.
 
 ### Multivariate Linear Regression
 
-Since only one variable was not enough to explain the relationship between the regulator and its targets we will now try to extend linear regression in order to include more variables in the model. Similarly to simple linear regression, we want to find the values for the model's parameters that minimize the residual sum of squares. The mathematical formulation of a multivariate linear regression is the following:
+Since only one variable was not enough to explain the relationship between the regulator and its targets we will now try to extend linear regression in order to include more variables in the model.\
+Similarly to simple linear regression, we want to find the values for the model's parameters that minimize the residual sum of squares.
 
-$$\hat{y}=\hat{\beta}_{0}+\hat{\beta}_{1} x_{1}+\hat{\beta}_{2} x_{2}+\cdots+\hat{\beta}_{p} x_{p}$$
+The mathematical formulation of a multivariate linear regression is the following:
+
+$$ \large\hat{y}=\hat{\beta}_{0}+\hat{\beta}_{1} x_{1}+\hat{\beta}_{2} 
+x_{2}+\cdots+\hat{\beta}_{p} x_{p}$$
 
 The least squares solution for this problem involves matrix multiplication and the use of the, so called, **pseudo-inverse** to compute the ${\hat\beta}$ coefficients then it uses them to compute the model's predictions $\hat{y}$ by multiplying the vector of coefficients $\hat{\beta}$ with the matrix of the predictors $X$.
 
-$\hat{\beta}=\left(\mathbf{X}^{T} \mathbf{X}\right)^{-1} \mathbf{X}^{T} \mathbf{y} \quad\quad$ with $X$ a $N \times (p+1)$ matrix, $y$ a $N \times 1$ vector
+$$ \large\hat{\beta}=\left(\mathbf{X}^{T} \mathbf{X}\right)^{-1} \mathbf{X}^{T} \mathbf{y} \quad\quad \text{ where } X \text{ is a matrix } N \times (p+1) \text{ and } y \text{ is a } N \times 1 \text{ vector}$$
 
-$\hat{\mathbf{y}}=\mathbf{X} \hat{\beta}=\mathbf{X}\left(\mathbf{X}^{T} \mathbf{X}\right)^{-1} \mathbf{X}^{T} \mathbf{y} \quad\quad$ with $\hat{y}$ the predicted value for each sample
+$$\large\hat{\mathbf{y}}=\mathbf{X} \hat{\beta}=\mathbf{X}\left(\mathbf{X}^{T} \mathbf{X}\right)^{-1} \mathbf{X}^{T} \mathbf{y} \quad\quad \text{ where } \hat{y} \text{ is the predicted value for each sample}$$
 
 The first step is creating a dataframe containing the expression of crp and of all its targets.
 
@@ -483,23 +494,25 @@ crp_lm <- train(crp ~.,
 crp_lm
 ```
 
-As you can see the $R^2$ of this model is still not satisfying at all and the RMSE is also very high: the Root Mean Square Error (RMSE) is a metric that describes the average distance between the predicted values and the real values
+As you can see the $R^2$ of this model is still not satisfying at all and the RMSE is also very high. The Root Mean Square Error (RMSE) is a metric that describes the average distance between the predicted values and the real values:
 
 $$
-RMSE = \sqrt{\dfrac{\sum^{n} _ {i = 1} \big(\hat{y_i} -\bar{y} \big)^2}{n - p}}
+\large RMSE = \sqrt{\dfrac{\sum^{n} _ {i = 1} \big(\hat{y_i} -\bar{y} \big)^2}{n - p}}
 $$
 
-which means that a value of RMSE = 9.858278 is very high in the context of gene expression because we are working in logarithmic scale. The reason why this model is so bad is directly told us by caret with a warning message (here suppressed) which says that the model was not able to obtain a lot of $\beta$ coefficients because our predictor variables are correlated and an important assumption of linear regression is the **independence of the predictor variables**. This strong correlation between our variables is expected because they are all genes controlled by our regulator crp so it makes very much sense that they are correlated and it is also one of the reasons of this analysis. In order to remove this multi-collinearity we will try 2 main approaches: **feature selection** and **dimensionality reduction.**
+which means that a value of RMSE = 9.858278 is very high in the context of gene expression because we are working in logarithmic scale. In addition we would like to underline that caret shows a warning message (here suppressed) which says that the model was not able to obtain a lot of $\hat \beta$ coefficients because our predictor variables are correlated. This is important because an assumption of linear regression is the **independence of the predictor variables**. This strong correlation is expected because they are all genes controlled by our regulator crp, so it makes very much sense that they are correlated and it is also one of the reasons of this analysis. \
+In order to remove this multi-collinearity we will try 2 main approaches: **feature selection** and **dimensionality reduction.**
 
 ### Lasso Regression
 
-The first approach we want to try is the Lasso Regression that is essentially multivariate linear regression but with the introduction of a **penalization term** which regularizes the estimates of the coefficients. This method is part of the family of the **shrinkage methods** and its main advantage is that it can force some of the coefficients of the model to be equal to 0 which means that it is also an effective way to perform feature selection. For this purpose Lasso minimizes the following function:
+The first approach we want to try is the Lasso Regression that is essentially multivariate linear regression but with the introduction of a **penalization term** which regularizes the estimates of the coefficients. This method is part of the family of the **shrinkage methods** and its main advantage is that it can force some of the coefficients of the model to be equal to 0; which means that it is also an effective way to perform feature selection. For this purpose Lasso minimizes the following function:
 
 $$
-\sum^n _{i=1} (y_i - \beta_0 - \sum^p _{j = 1}\beta_jx_{ij})^2 + \lambda\sum^p_{j = 1}|\beta_j|
+\large \sum^n _{i=1} (y_i - \beta_0 - \sum^p _{j = 1}\beta_jx_{ij})^2 + \lambda\sum^p_{j = 1}|\beta_j|
 $$
 
-Here p is the number of predictors (number of targets of crp) and $\lambda$ is a tunable hyperparameter which tells us how much we can "spend" in terms of coefficients, the right value of $\lambda$ forces some coefficients to 0 and perform feature selection. The best value for $\lambda$ has to be found with cross-validation for hyperparameter selection, it is interesting to note that if $\lambda$ = 0 this minimization is simply the least squares method. Another important thing to do is to scale our data because Lasso is a method sensible to the scale, luckily caret can do this very easily using the preProcess argument in the train function.
+Here $p$ is the number of predictors (number of targets of crp) and $\lambda$ is a tunable hyperparameter which tells us how much we can "spend" in terms of coefficients. The right value of $\lambda$ forces some coefficients to 0 and perform feature selection. \
+The best value for $\lambda$ has to be found with cross-validation for hyperparameter selection. It is interesting to note that if $\lambda$ = 0 this minimization is simply the least squares method. Another important thing to do is to scale our data because Lasso is a method sensible to the scale. Luckily caret can do this very easily using the preProcess argument in the train function.
 
 ```{r, warning = FALSE}
 set.seed(123)
@@ -517,7 +530,7 @@ crp_lasso <- train(crp ~.,
 crp_lasso
 ```
 
-For the tuning of $\lambda$ we tried powers of 10 from $10^{-5}$ to $10^5$ and as you can see for values greater than $10^{-1}$ the model was not able to correctly converge (caret gave a warning we suppressed) for the same reasons of linear regression discussed before but for smaller values of $\lambda$ they were able to converge and obtain good $R^2$.
+For the tuning of $\lambda$ we tried powers of 10 from $10^{-5}$ to $10^5$. As you can see for values greater than $10^{-1}$ the model was not able to correctly converge (caret gave a warning that we suppressed). The explanation is the same we saw for linear regression discussed before. Here for smaller values of $\lambda$ Lasso is able to converge and obtain good $R^2$.
 
 ```{r, fig.width = 12, fig.height = 5}
 cv_lasso_plot <-  ggplot(data = crp_lasso$results, aes(x = log10(lambda), y = RMSE, group=1)) +
@@ -531,26 +544,30 @@ cv_lasso_plot <-  ggplot(data = crp_lasso$results, aes(x = log10(lambda), y = RM
 cv_lasso_plot
 ```
 
-Finally with 10-fold cross-validation, as you can see from the plot above, we chose $\lambda = 10^{-3}$ as the final hyperparameter and the RMSE of this model is also very acceptable if we think in logarithmic scale in the context of gene expression. Let's now take a look to the coefficients of the model
+Finally we applied 10-fold cross-validation. As you can see from the plot above, we chose $\lambda = 10^{-3}$ as the final hyperparameter. Note that the RMSE of this model is also very acceptable if we think in logarithmic scale in the context of gene expression.
+
+Let's now take a look to the coefficients of the model:
 
 ```{r, fig.width = 12, fig.height = 7}
 plot(crp_lasso$finalModel, xvar = "lambda", xlab= "log(λ)")
 ```
 
-In this messy plot each line represents how the estimated coefficient $\hat\beta$ of a gene changes with respect to the value of $\lambda$, as you can see the majority of these lines go to 0 before $log(\lambda) = -3$ so these genes have their coefficient set to 0 while the remaining genes have a coefficient different from 0.\
-Another interesting way of visualizing the coefficients and their importance is through the use of the **vip package**. This package gives nice plots by ranking the variables with a model specific importance metric, in the case of Lasso it returns the absolute values of the coefficients and ranks them in descending order.
+In this messy plot each line represents how the estimated coefficient $\hat\beta$ of a gene changes with respect to the value of $\lambda$. As you can see the majority of these lines go to 0 before $log(\lambda) = -3$ so these genes have their coefficient set to 0, while the remaining genes have a coefficient different from 0.\
+Another interesting way of visualizing the coefficients and their importance is through the use of the **vip package**. The plot is resulting by ranking the variables with a model specific importance metric. In the case of Lasso it returns the absolute values of the coefficients and ranks them in descending order.
 
 ```{r, fig.width = 9, fig.height = 16}
 vip(crp_lasso$finalModel, method = "model", num_features = 125)
 ```
 
-It is very interesting to note that the first 121 gene coefficients are different from 0 and the remaining 189 gene coefficients are set to 0 by the Lasso procedure (here only 4 shown for simplicity). Let's now look at some of the most important genes and their biological function to see if their importance makes sense:
+It is very interesting to note that the first 121 gene coefficients are different from 0 and the remaining 189 gene coefficients are set to 0 by the Lasso procedure (here only 4 shown for simplicity).
 
-1)  **sucD**: succinyl-CoA synthetase is a very important enzime in the citric acid cycle, one the most fundamental processes of every living organism thus it enables the survival of the cell. sucD specifically is part of the $\alpha$ subunit which binds CoA and phosphate while the $\beta$ subunit binds the succinate in order to catalize the synthesis of succinyl-CoA. ![](img/sucD1.png) From a biological point of view it makes sense that this gene is very important because it is part of a basic biochemical process and in the image above you can see that crp, activated by cAMP, is involved in the transcription of the operon that contains sucD.
-2)  **rpsF**: 30S ribosomal subunit protein S6, as the name says, is a part of the 30S subunit of the ribosome which is the macromolecular complex, composed by rRNA and proteins, involved in the translation of mRNA to protein. ![](img/rpsF.PNG) Again this is a very basic biological process and also involve protein synthesis and we should remember that CRP itself is a protein so it makes much sense that the expression of this gene is able to explain the expression of crp.
-3)  **gatY**: tagatose-1,6-bisphosphate aldolase 2 is important in the process of galactitol degradation, a toxic alcohol which is a subproduct of galactose metabolism. Since galactose is a sugar used in many of the media on which the cultures of *Escherichia coli* are grown it makes sense that a gene involved in the degradation of a toxic compound related to galactose is important for crp, a global transcription factor, because it ensures the global survival of the cell in its environment. ![](img/gatY.PNG){width="600"}
+Let's now look at some of the most important genes and their biological function to see if their importance makes sense:
 
-Now we know that Lasso may be a reliable method for the modelling of our targets-regulator relationship but it is heavily dependent on the value of $\lambda$ chosen which might be different for other regulators, when we will analize all the genes we will try to verify this possibility.
+1)  **sucD**: succinyl-CoA synthetase is a very important enzime in the citric acid cycle, one the most fundamental processes of every living organism, thus it enables the survival of the cell. sucD specifically is part of the $\alpha$ subunit which binds CoA and phosphate, while the $\beta$ subunit binds the succinate in order to catalyze the synthesis of succinyl-CoA. ![](img/sucD1.png) From a biological point of view it makes sense that this gene is very important because it is part of a basic biochemical process. In the image above you can see that crp, activated by cAMP, is involved in the transcription of the operon that contains sucD.
+2)  **rpsF**: 30S ribosomal subunit protein S6, as the name says, is a part of the 30S subunit of the ribosome which is the macromolecular complex, composed by rRNA and proteins, involved in the translation of mRNA to protein. ![](img/rpsF.PNG)Again this is a very basic biological process and also involve protein synthesis. We should remember that CRP itself is a protein, so it makes much sense that the expression of this gene is able to explain the expression of crp.
+3)  **gatY**: tagatose-1,6-bisphosphate aldolase 2 is important in the process of galactitol degradation, a toxic alcohol which is a subproduct of galactose metabolism. Since galactose is a sugar used in many of the media on which the cultures of *Escherichia coli* are grown, it makes sense that a gene involved in the degradation of a toxic compound related to galactose is important for crp, a global transcription factor, because it ensures the global survival of the cell in its environment. ![](img/gatY.PNG){width="600"}
+
+We can confirm that Lasso is a reliable method from both the biological and the statistical point of view.
 
 ### Principal Component Regression
 
@@ -588,19 +605,24 @@ vip(crp_pca$finalModel, method = "model", num_features = 125)
 
 ### Decision Tree and Random Forest
 
-Decision Trees are among the most commonly used algorithms in machine learning for regression and classification and they work by dividing the predictor space $X_1, X_2, \dots, X_p$ in $J$ distinct and non-overlapping regions $R_1, R_2, \dots, R_J$ then for each test observation that falls in a region $R_j$ we make the same prediction which is the average of all the training observations that fall in that region. In a beautiful world we would like to divide the space in regions which minimizes the Residual Sum of Squares
+Decision Trees are among the most commonly used algorithms in machine learning for regression and classification. They work by dividing the predictor space $X_1, X_2, \dots, X_p$ in $J$ distinct and non-overlapping regions $R_1, R_2, \dots, R_J$. Then for each test observation that falls in a region $R_j$ we make the same prediction, which is the average of all the training observations that fall in that region. In a beautiful world we would like to divide the space in regions which minimizes the Residual Sum of Squares
 
 $$
-RSS = \sum^n _ {j=1}\sum _ {i \in R_j}(y_i - \hat{y}_{R_j})^2
+\large RSS = \sum^n _ {j=1}\sum _ {i \in R_j}(y_i - \hat{y}_{R_j})^2
 $$
 
-where $\hat{y}_{R_j}$ is the average response of the partition, the problem is that this approach is computationally impossible because it would need to try all the partitions and for this reason the actual way to partition the space is through the **recursive binary division** which is a top-down and greedy algorithm. The algorithm starts from the top of the tree then it starts doing binary divisions and each produces two new lower branches, the algorithm is greedy because at each step the best division is done only considering the current step instead of looking forward for better divisions. Once we have our regions $R_1, \dots, R_J$ we predict their response by taking the average of training observations falling in each region. This procedure may be good at fitting the training data, in fact too good because over-fitting is a serious issue of this approach. The reason of over-fitting is that the final tree may be extremely complex so our aim is now to prune the tree in order to have a smaller one which is more effective on unseen data. The most intuitive approach would be to cross-validate the error of each sub-tree but this is nearly impossible in terms of computational cost so we use the **cost complexity pruning**: we basically build a full tree that stops growing when a terminal leaf has less than a set number of observation than we find the tree which minimizes the following function
+where $\hat{y}_{R_j}$ is the average response of the partition. \
+The problem is that this approach is computationally impossible because it would need to try all the partitions. For this reason the actual way to partition the space is through the **recursive binary division** which is a top-down and greedy algorithm.
+
+The algorithm starts from the top of the tree, then it starts doing binary divisions and each of them produces two new lower branches. The algorithm is greedy because at each step the best division is done only considering the current step instead of looking forward for better divisions. \
+Once we have our regions $R_1, \dots, R_J$ we predict their response by taking the average of training observations falling in each region. This procedure is good at fitting the training data, but it could be a downside in terms of over-fitting. The reason is that the final tree may be extremely complex, so our aim is now to prune the tree in order to have a smaller one which is more effective on unseen data. \
+The most intuitive approach would be to cross-validate the error of each sub-tree, but this is nearly impossible in terms of computational cost. So we use the **cost complexity pruning**: we basically build a full tree that stops growing when a terminal leaf has less than a set number of observation. Than we find the tree which minimizes the following function:
 
 $$
-\sum^{|T|} _ {m=1}\sum _ {i: x_i \in R_m}(y_i - \hat{y}_{R_m})^2 + \alpha|T|
+\large \sum^{|T|} _ {m=1}\sum _ {i: x_i \in R_m}(y_i - \hat{y}_{R_m})^2 + \alpha|T|
 $$
 
-where $\alpha$ is a tuning hyperparameter which decides the cost complexity of the tree and $T$ is the number of terminal leaves of a specific tree, in this way we can use cross-validation to find the optimal value of $\alpha$. This formulation is indeed very similar to the Lasso regularization discussed before and in the same way if $\alpha = 0$ the tree is the unpruned tree. Let's now fit a regression tree and look for the optimal value of $\alpha$, here called ***cp*** which stands for cost complexity.
+where $\alpha$ is a tunable hyperparameter which decides the cost complexity of the tree and $T$ is the number of terminal leaves of a specific tree. In this way we can use cross-validation to find the optimal value of $\alpha$. This formulation is indeed very similar to the Lasso regularization discussed before and, in the same way, if $\alpha = 0$ the tree is the unpruned one. Let's now fit a regression tree and look for the optimal value of $\alpha$, here called ***cp*** which stands for cost complexity.
 
 ```{r}
 set.seed(123)
@@ -617,7 +639,7 @@ crp_tree <- train(crp ~.,
 crp_tree
 ```
 
-We got a final cp value of 0.02, which is indeed the value with the lowest RMSE as you can see from the plot below, the issue is that we got a somewhat unsatisfying result if we look at the $R^2$ of the model.
+We got a final cp value of 0.02, which is indeed the value with the lowest RMSE as you can see from the plot below. The issue is that we got a somewhat unsatisfying result if we look at the $R^2$ of the model.
 
 ```{r, fig.width = 12, fig.height = 5}
 cv_tree_plot <-  ggplot(data = crp_tree$results, aes(x = cp, y = RMSE, group=1)) +
@@ -637,13 +659,17 @@ Let's now look at the divisions made during the procedure.
 crp_tree$finalModel
 ```
 
-It is pretty hard to understand what is happening here so we can now visualize the tree in a nice way using the **rattle package** in order to have a more human readable result.
+It is pretty hard to understand what is happening here, so we can now visualize the tree in a nice way using the **rattle package** in order to have a more human readable result.
 
 ```{r, fig.width = 12, fig.height = 12}
 fancyRpartPlot(crp_tree$finalModel, sub = "", palettes = "Oranges")
 ```
 
-As you can see the root node starts by predicting the expression value of crp as 10.083130, then at each division it refines the response value. The first division is done by looking at the expression of the gene **ascB** that encodes for the phospho-β-glucosidase which basically hydrolizes the bond between D-glucose and D-glucose 6-phospate. The latter is the product of glycolysis first reaction which is the starting point of the oxidation of glucose for the production of ATP. ![](img/ascB.PNG){width="665"} As you can see ascB is regulated by CRP when cAMP binds CRP activating it. If we get more D-glucose 6-phospate in the system we have more ATP and less cAMP which means that the activity of CRP should be lower; one important feature of CRP is that it *negatively autoregulates* itself, so it makes sense that for lower levels of ascB we have lower expression values of crp because there is less D-glucose 6-phospate and more cAMP in the cell which makes CRP more active which negatively autoregulates itself. Even if this first decision makes sense it is probably better to try a more robust method because decision trees are very easy to explain but not very accurate. **Random Forest** is a more sophisticated version of decision trees, in fact the rationale is to build many different decision trees (by default caret build 500 trees) and take as the final prediction the average response of them. Many different random trees are built and each one of them only use a random subset of all the possible predictors; this subset has a length $m$ where the most used value is $m = \sqrt{p}$, in this way we obtain many smaller trees that uses only a very small portion of the predictors for their divisions. Then it applies methods to decorrelate the trees and finally it takes the average of all the responses of this "random forest".
+As you can see the root node starts by predicting the expression value of crp as 10.083130. Then at each division it refines the response value. \
+The first division is done by looking at the expression of the gene **ascB** that encodes for the phospho-β-glucosidase which basically hydrolizes the bond between D-glucose and D-glucose 6-phospate. The latter is the product of glycolysis first reaction which is the starting point of the oxidation of glucose for the production of ATP. ![](img/ascB.PNG){width="665"} \
+As you can see here ascB is regulated by CRP when cAMP binds CRP activating it. If we get more D-glucose 6-phospate in the system we have more ATP and less cAMP , which means that the activity of CRP should be lower. One important feature of CRP is that it *negatively autoregulates* itself, so it makes sense that for lower levels of ascB we have lower expression values of crp. This because there is less D-glucose 6-phospate and more cAMP in the cell, which makes CRP more active that negatively autoregulates itself. Even if this first decision makes sense it is probably better to try a more robust method because decision trees are very easy to explain but not very accurate.
+
+**Random Forest** is a more sophisticated version of decision trees, in fact the rationale is to build many different decision trees and take as the final prediction the average response of them. Many different random trees are built and each of them only use a random subset of all the possible predictors. This subset has a length $m$ where the most used value is $m = \sqrt{p}$. In this way we obtain many smaller trees that uses only a very small portion of the predictors for their divisions. Then it applies methods to decorrelate the trees and finally it takes the average of all the responses of this "random forest".
 
 ```{r}
 set.seed(123)
@@ -661,7 +687,7 @@ crp_forest <- train(crp ~.,
 crp_forest
 ```
 
-As you can see the cross-validation $R^2$ and RMSE of this model is fully comparable to the linear regression methods we used before and random forest is known to be highly accurate and powerful and also as easy to interpret as linear regression. To look at the results we could sample a random tree out of the forest and visualize it as before but we may get the same bias so it is better to look at the distribution of the **minimal depth** that is the distance between the root of a tree and the node/split where a given gene was used.
+As you can see the cross-validation $R^2$ and RMSE of this model are fully comparable to the linear regression methods we used before. In addition random forest is known to be highly accurate, powerful and easy to interpret as linear regression. In order to look for the results we could sample a random tree out of the forest and visualize it as before but we may get the same bias. So it is better to look at the distribution of the **minimal depth** that is the distance between the root of a tree and the node/split where a given gene was used.
 
 ```{r}
 # compute all the minimal depths of each gene
@@ -671,7 +697,10 @@ min_depth_frame <- min_depth_distribution(crp_forest$finalModel)
 plot_min_depth_distribution(min_depth_frame, k = 15)
 ```
 
-This beautiful plot has on the x-axis the total number of trees and on the y-axis the genes we are considering, each color represents a depth value and the length of the colored box how many trees have that depth value for the considered gene. The plot also tells us the average minimal depth for that gene across all the trees. We chose to show only the top 15 genes by average minimal depth because a *lower value of average minimal depth tells how important for the model the gene is*. As you can see many of the target genes we discussed before like rpsF, galY, ascB are shown here and now we have multiple confirmations that these genes can be used as a proxy for the activity of crp. Now we can look more in detail at the genes interaction of this model to see if they make sense, firstly we take the top 5 genes by importance considering both their mean minimal depth and the number of trees in which they appear the we use this information to get the interaction plot.
+This beautiful plot has on the x-axis the total number of trees and on the y-axis the genes we are considering. Each color represents a depth value and the length of the colored box represents how many trees have that depth value for the considered gene. This plot also tells us the average minimal depth for that gene across all the trees. \
+We chose to show only the top 15 genes by average minimal depth because a *lower value of average minimal depth tells how important for the model the gene is*. As you can see many of the target genes we discussed before like rpsF, galY, ascB are shown here, but now we have multiple confirmations that these genes can be used as a proxy for the activity of crp.
+
+Now we can look more in detail at the genes interaction of this model to see if they make sense. Firstly we take the top 5 genes by importance considering both their mean minimal depth and the number of trees in which they appear. Then we use this information to get the interaction plot.
 
 ```{r, warning = FALSE}
 # Get the top 5 genes
@@ -684,11 +713,11 @@ interactions_frame <- min_depth_interactions(crp_forest$finalModel, forest_genes
 plot_min_depth_interactions(interactions_frame)
 ```
 
-In this plot the interactions are ranked by the number of occurrences, defined by the color, while on the y-axis you see the value of the mean minimal depth. Remember that these are interactions according to the random forest model and not strictly in the biological sense so they don't necessarily have a biological meaning but we will still try to make sense of them if possible.
+In this plot the interactions are ranked by the number of occurrences, defined by the color, while on the y-axis you see the value of the mean minimal depth. Remember that these are interactions according to the random forest model and not strictly in the biological sense. This means that they don't necessarily have a biological meaning, but we will still try to make sense of them if possible.
 
-1)  **glpQ:glpQ**: GlpQ is a periplasmic protein that catalyzes the hydrolysis of glycerophosphodiesters into glycerol-P and an alcohol. The glycerol-P is then transported into the cell by the glycerol-P transporter, GlpT. As you can see from the chart below this self-interaction is explainable by the fact the glpQ is controlled by glpR which is activated by glicerol. In a tree you can visualize a "self-interaction" as a split due to some value of glpQ followed by another split which uses again glpQ for deeper divisions.![](img/glpQ-glpQ.PNG){width="665"}
-2)  **gspA:chbA**: gspA is part of a cluster of genes that encodes the components of a type II secretion system, an important protein of the outer-membrane of *E. coli* which is a gram negative species. The interesting thing is that N-acetyl-glucosamine is a primary component of the peptidoglycan layer which is under the outer-membrane and you can see in the picture that it is involved in the regulation of chbA through ChbR along with CRP and other transcription factors. ![](img/chbA.PNG){width="665"} Even if we are not fully able to explain this interaction it makes some sense because these genes are functionally related in some way, this fact makes evident the complexity of biological interactions.
-3)  **gspA:idnK**: idnK is a thermosensitive D-gluconate kinase, D-gluconate 6-phospate is an intermediate of the pentose phospate pathway. This biochemical process is not directly related to outer-membrane secretion and for this reason the interaction with gspA is probably due to the common regulation by CRP instead of some common biological function.
-4)  **gspA:glpQ**: as we said before GlpQ is a periplasmic protein and gspA is part of type II secretion system which secretes folded proteins from the periplasm to outside world, as we said for the gspA:chbA interaction there is some functional correlation but we are not able to fully make sense of it.
+1)  **glpQ:glpQ**: GlpQ is a periplasmic protein that catalyzes the hydrolysis of glycerophosphodiesters into glycerol-P and an alcohol. The glycerol-P is then transported into the cell by the glycerol-P transporter, GlpT. As you can see from the chart below this self-interaction is explainable by the fact the glpQ is controlled by glpR which is activated by glicerol. In a tree you can visualize a "self-interaction" as a split due to some value of glpQ followed by another split, which uses again glpQ for deeper divisions.![](img/glpQ-glpQ.PNG){width="665"}
+2)  **gspA:chbA**: gspA is part of a cluster of genes that encodes the components of a type II secretion system, an important protein of the outer-membrane of *E. coli* which is a gram negative species. The interesting thing is that N-acetyl-glucosamine is a primary component of the peptidoglycan layer which is under the outer-membrane. As you can see in the picture, it is involved in the regulation of chbA through ChbR along with CRP and other transcription factors. ![](img/chbA.PNG){width="665"} Even if we are not fully able to explain this interaction, it makes some sense because these genes are functionally related in some way.
+3)  **gspA:idnK**: idnK is a thermosensitive D-gluconate kinase, D-gluconate 6-phospate is an intermediate of the pentose phospate pathway. This biochemical process is not directly related to outer-membrane secretion and, for this reason, the interaction with gspA is probably due to the common regulation by CRP instead of some common biological function.
+4)  **gspA:glpQ**: as we said before GlpQ is a periplasmic protein and gspA is part of type II secretion system which secretes folded proteins from the periplasm to the outside world. As we said for the gspA:chbA interaction there is some functional correlation but we are not able to fully make sense of it.
 
-In conclusion random forest is a very reliable model for genes that have an high number of targets but it is not as good for regulators that have a lower number of target genes because we would have much less options for tree splitting.
+In conclusion random forest is a very reliable model for genes that have an high number of targets, but it is not as good for regulators that have a lower number of target genes. This because we would have much less options for tree splitting.
