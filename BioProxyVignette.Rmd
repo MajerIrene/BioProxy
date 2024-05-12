@@ -599,6 +599,8 @@ cv_pcr_plot <-  ggplot(data = crp_pca$results, aes(x = ncomp, y = RMSE, group=1)
 cv_pcr_plot
 ```
 
+In the elbow plot, we can see that the value for the RMSE oscillate between lower and higher value, without reaching a defined plateau. This could be a sign of overfitting.
+
 ```{r, fig.width = 9, fig.height = 16}
 vip(crp_pca$finalModel, method = "model", num_features = 125)
 ```
@@ -721,3 +723,51 @@ In this plot the interactions are ranked by the number of occurrences, defined b
 4)  **gspA:glpQ**: as we said before GlpQ is a periplasmic protein and gspA is part of type II secretion system which secretes folded proteins from the periplasm to the outside world. As we said for the gspA:chbA interaction there is some functional correlation but we are not able to fully make sense of it.
 
 In conclusion random forest is a very reliable model for genes that have an high number of targets, but it is not as good for regulators that have a lower number of target genes. This because we would have much less options for tree splitting.
+
+# Model Choice 
+
+Now we want to summarize the results of our analysis, reporting both RMSE and $R^2$ for each cross-validated model:
+
+| Model                          | $$         
+                                  R^2         
+                                  $$          | $$        
+                                               RMSE       
+                                               $$         |
+|--------------------------------|------------|-----------|
+| Linear Regression              | 0.03536782 | 0.3720215 |
+| Multivariate Linear Regression | 0.09793242 | 9.858278  |
+| Lasso Regression               | 0.7797536  | 0.1752410 |
+| PCR                            | 0.77319657 | 0.1799469 |
+| Decision Tree                  | 0.3108767  | 0.3358151 |
+| Random Forest                  | 0.7294742  | 0.2409751 |
+
+Simple and multivariate linear regression performed poorly on the data. This was evident from the beginning because the assumptions were not respected. Also Decision Tree performed quite badly, this because a single tree can't achieve the complexity of the data that we are using.
+
+Lasso Regression, PCR and Random Forest show positive results in term of $R^2$ and RMSE. How we can choose between them? PCR lack interpretability since the data are projected in a different space and it seems to overfit the data. Furthermore dimensionality reduction does not make sense in all the cases where the regulators have few targets. \
+Random Forest performed quite well, but it isn't generalizable to all the genes. It can be applied only on regulators with enough targets, while most of the genes have few connections.
+
+We can conclude that Lasso Regression is the best model in statistical terms and is very interpretable. In addition it could be applied on all the regulators, since it does not have the limitations seen for the random forest approach.
+
+# Model application
+
+Now we want to apply Lasso Regression to all the regulators to see the overall performance. Then we are going to check if the expressions of the regulators are effectively linked with the expressions of their target. The last step will be to check if some regulators are correlated with the activity of the corresponding kinase.
+
+```{r}
+
+```
+
+```{r}
+set.seed(123)
+# Tuning grid for Lasso 
+tune_grid_lasso <- expand.grid(alpha = 1, #tell the function to perform lasso
+                               lambda = 10^(-5:5)) #values of lambda to try
+
+# Lasso training, cv and hyperparameter tuning
+crp_lasso <- train(crp ~., 
+                   data = crp_full,
+                   method = "glmnet",
+                   preProcess = c("center", "scale"), #this basically transform in Z scores
+                   trControl = fit_control,
+                   tuneGrid = tune_grid_lasso)
+crp_lasso
+```

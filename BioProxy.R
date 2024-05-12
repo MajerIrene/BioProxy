@@ -311,3 +311,100 @@ rclR_lm <- train(rclR ~.,
                  preProcess = c("center", "scale", "pca", "zv"),
                  trControl = fit_control)
 summary(rclR_lm$finalModel)
+
+
+
+lasso <- function(regulator, exp_matrix, reg_network){
+  
+  # Expression of regulator
+  regulator_exp <- exp_matrix[,colnames(exp_matrix) == regulator]
+  
+  # List of positively regulated targets by crp
+  target <- reg_network[reg_network$X3.RegulatorGeneName == regulator,]
+  
+  # Remove autoregulation
+  if(regulator %in% target)
+    target <- subset(target, -regulator)
+    
+  # Expression of the targets
+  target_exp <- exp_matrix[,colnames(exp_matrix) %in% target$X5.regulatedName]
+  
+  regulator_exp <- data.frame(regulator = regulator_exp)
+  #colnames(regulator_exp) <- regulator
+  regulator_full <- data.frame(cbind(regulator_exp, target_exp))
+  
+  #CV
+  fit_control <- trainControl(
+    method = "repeatedcv",
+    number = 10,
+    ## repeated ten times
+    repeats = 10)
+  
+  #LASSO
+  set.seed(123)
+  # Tuning grid for Lasso 
+  tune_grid_lasso <- expand.grid(alpha = 1, #tell the function to perform lasso
+                                 lambda = c(0, 10^(-5:5))) #values of lambda to try
+  
+  # Lasso training, cv and hyperparameter tuning
+  reg_lasso <- train(regulator ~., 
+                     data = regulator_full,
+                     method = "glmnet",
+                     preProcess = c("center", "scale"), #this basically transform in Z scores
+                     trControl = fit_control,
+                     tuneGrid = tune_grid_lasso)
+  return(reg_lasso)
+}
+
+unique_pos_reg <- list(unique(positive_reg$X3.RegulatorGeneName))
+
+results <- lapply(unique_pos_reg, lasso, exp_matrix=log_tpm, reg_network=positive_reg)
+
+
+
+lasso(unique(positive_reg), log_tpm, positive_reg)
+
+
+#LASSO
+set.seed(123)
+# Tuning grid for Lasso 
+tune_grid_lasso <- expand.grid(alpha = 1, #tell the function to perform lasso
+                               lambda = 10^(-5:5)) #values of lambda to try
+
+# Lasso training, cv and hyperparameter tuning
+crp_lasso <- train(crp ~., 
+                   data = crp_full,
+                   method = "glmnet",
+                   preProcess = c("center", "scale"), #this basically transform in Z scores
+                   trControl = fit_control,
+                   tuneGrid = tune_grid_lasso)
+crp_lasso
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
