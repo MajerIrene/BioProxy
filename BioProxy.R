@@ -315,7 +315,6 @@ summary(rclR_lm$finalModel)
 
 
 lasso <- function(regulator, exp_matrix, reg_network){
-  
   # Expression of regulator
   regulator_exp <- exp_matrix[,colnames(exp_matrix) == regulator]
   
@@ -323,12 +322,12 @@ lasso <- function(regulator, exp_matrix, reg_network){
   target <- reg_network[reg_network$X3.RegulatorGeneName == regulator,]
   
   # Remove autoregulation
-  if(regulator %in% target)
-    target <- subset(target, -regulator)
+  #if(regulator %in% unique(target$X5.regulatedName))
+  #  target <- target[(target$X5.regulatedName != regulator),]
     
   # Expression of the targets
-  target_exp <- exp_matrix[,colnames(exp_matrix) %in% target$X5.regulatedName]
-  
+  target_exp <- data.frame(exp_matrix[,colnames(exp_matrix) %in% target$X5.regulatedName])
+  colnames(target_exp) <- unique(target$X5.regulatedName)
   regulator_exp <- data.frame(regulator = regulator_exp)
   #colnames(regulator_exp) <- regulator
   regulator_full <- data.frame(cbind(regulator_exp, target_exp))
@@ -345,31 +344,45 @@ lasso <- function(regulator, exp_matrix, reg_network){
   # Tuning grid for Lasso 
   tune_grid_lasso <- expand.grid(alpha = 1, #tell the function to perform lasso
                                  lambda = c(0, 10^(-5:5))) #values of lambda to try
-  
+  if(ncol(target_exp) <= 10){
+    reg <- train(regulator ~., 
+                       data = regulator_full,
+                       method = "lm",
+                       preProcess = c("center", "scale"), #this basically transform in Z scores
+                       trControl = fit_control)
+  }
+  else{
   # Lasso training, cv and hyperparameter tuning
-  reg_lasso <- train(regulator ~., 
+        reg <- train(regulator ~., 
                      data = regulator_full,
                      method = "glmnet",
                      preProcess = c("center", "scale"), #this basically transform in Z scores
                      trControl = fit_control,
                      tuneGrid = tune_grid_lasso)
-  return(reg_lasso)
+  }
+  return(reg)
 }
 
-unique_pos_reg <- list(unique(positive_reg$X3.RegulatorGeneName))
+unique_pos_reg <- unique(positive_reg$X3.RegulatorGeneName)
+
 
 results <- lapply(unique_pos_reg, lasso, exp_matrix=log_tpm, reg_network=positive_reg)
 
+positive_reg <- positive_reg[!(positive_reg$X3.RegulatorGeneName == positive_reg$X5.regulatedName),]
 
-
-lasso(unique(positive_reg), log_tpm, positive_reg)
+results <- vector("list", length = length(unique_pos_reg))
+for(i in 1:length(results)){
+    result <- lapply(unique_pos_reg[i], lasso, exp_matrix=log_tpm, reg_network=positive_reg)
+    results[i] <- list(c(name = unique_pos_reg[i], model = result))
+    
+}
 
 
 #LASSO
 set.seed(123)
 # Tuning grid for Lasso 
 tune_grid_lasso <- expand.grid(alpha = 1, #tell the function to perform lasso
-                               lambda = 10^(-5:5)) #values of lambda to try
+                               lambda = 0) #values of lambda to try
 
 # Lasso training, cv and hyperparameter tuning
 crp_lasso <- train(crp ~., 
@@ -380,23 +393,29 @@ crp_lasso <- train(crp ~.,
                    tuneGrid = tune_grid_lasso)
 crp_lasso
 
+nrow(positive_reg)
+positive_reg <- positive_reg[!(positive_reg$X3.RegulatorGeneName == positive_reg$X5.regulatedName),]
+
+regulator <- unique_pos_reg[3]
+regulator_exp <- log_tpm[,colnames(log_tpm) == regulator]
+target <- positive_reg[positive_reg$X3.RegulatorGeneName == regulator,]
+target_exp <- data.frame(log_tpm[,colnames(log_tpm) %in% target$X5.regulatedName])
+colnames(target_exp) <- target$X5.regulatedName
+
+regulator_exp <- data.frame(regulator = regulator_exp)
+#colnames(regulator_exp) <- regulator
+regulator_full <- data.frame(cbind(regulator_exp, target_exp))
 
 
+prova_lasso <- train(regulator ~., 
+                     data = regulator_full,
+                     method = "lm",
+                     preProcess = c("center", "scale"),
+                     trControl = fit_control,
+                     tuneGrid = tune_grid_lasso)
+prova_lasso
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# togliere geni che non ci sono in log tpm e i geni doppi
 
 
 
