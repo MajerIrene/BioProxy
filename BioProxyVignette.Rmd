@@ -224,7 +224,8 @@ shapiro.test(log_tpm_min$value) #not gaussian
 
 Based on the results of the Shapiro-Wilk tests conducted on the four distributions and their respective histograms, we can conclude that the distributions do not follow to a Gaussian (normal) distribution.\
 
-*Consequently, this implies that choosing measures such as the mean, median, maximum, or minimum may not match the linear regression assumption that the data follows a Gaussian (normal) distribution, for this reason it is not possible to use one of these statistics as a predictor in our model because none of them is normally distributed but the biggest problem is that we would train a model on a single sample and it does not make any sense. In the next section about modelling we will try instead to take the mean of all the targets in every condition and fit a model with 1 feature (mean of the targets) and as many samples as the conditions that we have.*
+There's a potential issue with using statistics like mean, median, maximum, or minimum as predictors in our linear regression model. These statistics might not align with the model's assumption that the data follows a normal (bell-shaped) distribution. Additionally, using just one of these statistics for each condition would essentially be training the model on a single data point per condition, which wouldn't be statistically sound.\
+To address this, in the next section on modeling, we'll explore using the average (mean) of all target values within each condition. This approach provides us with multiple data points per condition (one average value for each condition) and avoids relying on single data points like minimum or maximum.
 
 Now we plot some histograms to have a better idea on the number of positive, negative and total interactions of each regulator:
 
@@ -290,7 +291,7 @@ total_counts_hist <- ggplot(total_counts, aes(x = value)) +
 grid.arrange(pos_counts_hist, neg_counts_hist, total_counts_hist, ncol = 1)
 ```
 
-These histograms show how many genes are regulated by how many regulators, the horizontal axis indicates how many genes are controlled by the regulator and the vertical axis indicates how many regulators have that number of interactions; for example there are more than 150 regulators that positively interact with 0 genes, this is not surprising because we removed weak and unknown interactions and we can also see that there is a gene that negatively controls a number of genes close to 400. There are slightly more negative regulators that interact with at least one gene then positive. In addition we observe that majority of genes does not interact with other genes but there are some exceptions like the gene **crp** which positively interacts with 310 other genes.
+These histograms show how many genes are regulated by how many regulator. The horizontal axis indicates how many genes are controlled by the regulator and the vertical axis indicates how many regulators have that number of interactions; for example there are more than 150 regulators that positively interact with 0 genes .This is not surprising because we removed weak and unknown interactions and we can also see that there is a gene that negatively controls a number of genes close to 400. There are slightly more negative regulators that interact with at least one gene then positive. In addition we observe that majority of genes does not interact with other genes but there are some exceptions like the gene **crp** which positively interacts with 310 other genes.
 
 ### Network analysis
 
@@ -301,8 +302,6 @@ edge_list <- cbind(RegulatorName = regulator$X3.RegulatorGeneName,
 graph <- graph_from_edgelist(edge_list)
 layout <- layout_with_fr(graph, niter=100)
 
-
-# Visualizzazione 3D della network
 plot.igraph(graph, layout=layout, vertex.label=NA, vertex.size=3, edge.arrow.size=0.2, edge.curved=TRUE, main="E.coli Network", xlim=c(-0.5, 0.5), ylim=c(-1, 1))
 
 ```
@@ -500,7 +499,7 @@ $$
 \large RMSE = \sqrt{\dfrac{\sum^{n} _ {i = 1} \big(\hat{y_i} -\bar{y} \big)^2}{n - p}}
 $$
 
-which means that a value of RMSE = 9.858278 is very high in the context of gene expression because we are working in logarithmic scale. In addition we would like to underline that caret shows a warning message (here suppressed) which says that the model was not able to obtain a lot of $\hat \beta$ coefficients because our predictor variables are correlated. This is important because an assumption of linear regression is the **independence of the predictor variables**. This strong correlation is expected because they are all genes controlled by our regulator crp, so it makes very much sense that they are correlated and it is also one of the reasons of this analysis. \
+which means that a value of RMSE = 9.858278 is very high in the context of gene expression because we are working in logarithmic scale. In addition we would like to underline that caret shows a warning message (here suppressed) which says that the model was not able to obtain a lot of $\hat \beta$ coefficients because our predictor variables are correlated. This is important because an assumption of linear regression is the **independence of the predictor variables**. This strong correlation is expected because they are all genes controlled by our regulator crp, so it makes very much sense that they are correlated and it is also one of the reasons of this analysis.\
 In order to remove this multi-collinearity we will try 2 main approaches: **feature selection** and **dimensionality reduction.**
 
 ### Lasso Regression
@@ -511,7 +510,7 @@ $$
 \large \sum^n _{i=1} (y_i - \beta_0 - \sum^p _{j = 1}\beta_jx_{ij})^2 + \lambda\sum^p_{j = 1}|\beta_j|
 $$
 
-Here $p$ is the number of predictors (number of targets of crp) and $\lambda$ is a tunable hyperparameter which tells us how much we can "spend" in terms of coefficients. The right value of $\lambda$ forces some coefficients to 0 and perform feature selection. \
+Here $p$ is the number of predictors (number of targets of crp) and $\lambda$ is a tunable hyperparameter which tells us how much we can "spend" in terms of coefficients. The right value of $\lambda$ forces some coefficients to 0 and perform feature selection.\
 The best value for $\lambda$ has to be found with cross-validation for hyperparameter selection. It is interesting to note that if $\lambda$ = 0 this minimization is simply the least squares method. Another important thing to do is to scale our data because Lasso is a method sensible to the scale. Luckily caret can do this very easily using the preProcess argument in the train function.
 
 ```{r, warning = FALSE}
@@ -552,8 +551,9 @@ Let's now take a look to the coefficients of the model:
 plot(crp_lasso$finalModel, xvar = "lambda", xlab= "log(λ)")
 ```
 
-In this messy plot each line represents how the estimated coefficient $\hat\beta$ of a gene changes with respect to the value of $\lambda$. As you can see the majority of these lines go to 0 before $log(\lambda) = -3$ so these genes have their coefficient set to 0, while the remaining genes have a coefficient different from 0.\
-Another interesting way of visualizing the coefficients and their importance is through the use of the **vip package**. The plot is resulting by ranking the variables with a model specific importance metric. In the case of Lasso it returns the absolute values of the coefficients and ranks them in descending order.
+In this messy plot each line represents how the estimated coefficient $\hat\beta$ of a gene changes with respect to the value of $\lambda$. As you can see the majority of these lines go to 0 before $log(\lambda) = -3$ so these genes have their coefficient set to 0, while the remaining genes have a coefficient different from 0.
+
+The plot is resulting by ranking the variables with a model specific importance metric. In the case of Lasso it returns the absolute values of the coefficients and ranks them in descending order.
 
 ```{r, fig.width = 9, fig.height = 16}
 vip(crp_lasso$finalModel, method = "model", num_features = 125)
@@ -571,6 +571,48 @@ We can confirm that Lasso is a reliable method from both the biological and the 
 
 ### Principal Component Regression
 
+Principal component analysis (PCA) is a dimensionality reduction technique that aims to capture the most significant variations within the data by transforming it into a new coordinate system with fewer dimensions. Principal component regression (PCR) is a statistical technique that uses PCA for regression analysis. How does PCA works?
+
+![](images/clipboard-4096431045.png){width="332"}
+
+Principal components are new directions (axes) created by PCA in that high-dimensional space.These PCs represent the directions of greatest variance in the data. The first principal component captures the most variance, the second PC captures the remaining largest variance, and so on.\
+First, we need to find the covariance matrix which helps identify directions (principal components) where data points exhibit the most variation.
+
+$$
+\sum =\begin{bmatrix}
+\sigma_{11} & \cdots & \sigma_{1p}\\
+\vdots & \ddots & \vdots \\
+\sigma_{p1} & \cdots & \sigma_{pp}
+\end{bmatrix}
+$$
+
+With eigenvalue decomposition we extract these directions (eigenvectors) and the amount of variance explained by each direction (eigenvalues). For example the first principal component is the normalized linear combination of the features that has maximal variance (captures the highest variability in data)
+
+$$Z_1= \phi_{11}X_1 + \phi_{21}X_2 + \cdots + \phi_{p1}X_p
+$$ Where:
+
+-   X’s are a set of features
+
+-   $\phi$’s are called **loadings** of the first principal component and the vector $\phi_1 = [\phi_{11} \phi_{21} \cdots \phi_{p1}]^T$ is the principal component vector
+
+-   Normalized means $\sum_{j=1}^p \phi_{j1}^2 = \phi_{1}^T \phi_{1}^T =1$ otherwise setting these elements to be arbitrarily large in absolute value could result in an arbitrarily large variance.
+
+The first principal component (PC1) is the first eigenvector associated with the largest eigenvalue of the covariance matrix. We can then calculate the number of PCs that represent the majority of variability in the data. The last step is projecting data onto these new directions (principal components) allows for dimensionality reduction while retaining the most informative variations in the data.
+
+The main benefits are:
+
+-   Reduction of the multicollinearity -\> PCR chooses the variables that explain the majority of variability
+
+-   The principal components identified by PCA can be used as a form of feature selection for further analysis.
+
+But there are also some aspects to consider:
+
+-   Choosing the right number of principal components is crucial. Selecting too few components might lead to underfitting, while too many can introduce noise and reduce interpretability.
+
+-   Issue of interpretability because understanding the biological meaning of the linear combination can be challenging.
+
+We choose this method because crp has 300 target so it is important to reduce the number of variabile, to the ones that are really associated with the response.
+
 ```{r}
 set.seed(123)
 
@@ -587,6 +629,8 @@ crp_pca <- train(crp ~.,
 crp_pca
 ```
 
+While the model achieves a high $R^2$ value of 0.773 and a low RMSE of 0.179, these metrics suggest that the model is fitting the training data too closely and may not generalize well to unseen data.
+
 ```{r, fig.width = 12, fig.height = 5}
 cv_pcr_plot <-  ggplot(data = crp_pca$results, aes(x = ncomp, y = RMSE, group=1)) +
                 ggtitle("Principal Component Regression Cross-Validation Results") +
@@ -599,7 +643,9 @@ cv_pcr_plot <-  ggplot(data = crp_pca$results, aes(x = ncomp, y = RMSE, group=1)
 cv_pcr_plot
 ```
 
-In the elbow plot, we can see that the value for the RMSE oscillate between lower and higher value, without reaching a defined plateau. This could be a sign of overfitting.
+The oscillating behavior of the RMSE in the elbow plot for PCR suggests that there might not be a clear "sweet spot" for the number of principal components (PCs) to choose. This could be a sign of overfitting.
+
+Here again we report the vip plot.
 
 ```{r, fig.width = 9, fig.height = 16}
 vip(crp_pca$finalModel, method = "model", num_features = 125)
@@ -613,11 +659,11 @@ $$
 \large RSS = \sum^n _ {j=1}\sum _ {i \in R_j}(y_i - \hat{y}_{R_j})^2
 $$
 
-where $\hat{y}_{R_j}$ is the average response of the partition. \
+where $\hat{y}_{R_j}$ is the average response of the partition.\
 The problem is that this approach is computationally impossible because it would need to try all the partitions. For this reason the actual way to partition the space is through the **recursive binary division** which is a top-down and greedy algorithm.
 
-The algorithm starts from the top of the tree, then it starts doing binary divisions and each of them produces two new lower branches. The algorithm is greedy because at each step the best division is done only considering the current step instead of looking forward for better divisions. \
-Once we have our regions $R_1, \dots, R_J$ we predict their response by taking the average of training observations falling in each region. This procedure is good at fitting the training data, but it could be a downside in terms of over-fitting. The reason is that the final tree may be extremely complex, so our aim is now to prune the tree in order to have a smaller one which is more effective on unseen data. \
+The algorithm starts from the top of the tree, then it starts doing binary divisions and each of them produces two new lower branches. The algorithm is greedy because at each step the best division is done only considering the current step instead of looking forward for better divisions.\
+Once we have our regions $R_1, \dots, R_J$ we predict their response by taking the average of training observations falling in each region. This procedure is good at fitting the training data, but it could be a downside in terms of over-fitting. The reason is that the final tree may be extremely complex, so our aim is now to prune the tree in order to have a smaller one which is more effective on unseen data.\
 The most intuitive approach would be to cross-validate the error of each sub-tree, but this is nearly impossible in terms of computational cost. So we use the **cost complexity pruning**: we basically build a full tree that stops growing when a terminal leaf has less than a set number of observation. Than we find the tree which minimizes the following function:
 
 $$
@@ -667,8 +713,8 @@ It is pretty hard to understand what is happening here, so we can now visualize 
 fancyRpartPlot(crp_tree$finalModel, sub = "", palettes = "Oranges")
 ```
 
-As you can see the root node starts by predicting the expression value of crp as 10.083130. Then at each division it refines the response value. \
-The first division is done by looking at the expression of the gene **ascB** that encodes for the phospho-β-glucosidase which basically hydrolizes the bond between D-glucose and D-glucose 6-phospate. The latter is the product of glycolysis first reaction which is the starting point of the oxidation of glucose for the production of ATP. ![](img/ascB.PNG){width="665"} \
+As you can see the root node starts by predicting the expression value of crp as 10.083130. Then at each division it refines the response value.\
+The first division is done by looking at the expression of the gene **ascB** that encodes for the phospho-β-glucosidase which basically hydrolizes the bond between D-glucose and D-glucose 6-phospate. The latter is the product of glycolysis first reaction which is the starting point of the oxidation of glucose for the production of ATP. ![](img/ascB.PNG){width="665"}\
 As you can see here ascB is regulated by CRP when cAMP binds CRP activating it. If we get more D-glucose 6-phospate in the system we have more ATP and less cAMP , which means that the activity of CRP should be lower. One important feature of CRP is that it *negatively autoregulates* itself, so it makes sense that for lower levels of ascB we have lower expression values of crp. This because there is less D-glucose 6-phospate and more cAMP in the cell, which makes CRP more active that negatively autoregulates itself. Even if this first decision makes sense it is probably better to try a more robust method because decision trees are very easy to explain but not very accurate.
 
 **Random Forest** is a more sophisticated version of decision trees, in fact the rationale is to build many different decision trees and take as the final prediction the average response of them. Many different random trees are built and each of them only use a random subset of all the possible predictors. This subset has a length $m$ where the most used value is $m = \sqrt{p}$. In this way we obtain many smaller trees that uses only a very small portion of the predictors for their divisions. Then it applies methods to decorrelate the trees and finally it takes the average of all the responses of this "random forest".
@@ -699,7 +745,7 @@ min_depth_frame <- min_depth_distribution(crp_forest$finalModel)
 plot_min_depth_distribution(min_depth_frame, k = 15)
 ```
 
-This beautiful plot has on the x-axis the total number of trees and on the y-axis the genes we are considering. Each color represents a depth value and the length of the colored box represents how many trees have that depth value for the considered gene. This plot also tells us the average minimal depth for that gene across all the trees. \
+This beautiful plot has on the x-axis the total number of trees and on the y-axis the genes we are considering. Each color represents a depth value and the length of the colored box represents how many trees have that depth value for the considered gene. This plot also tells us the average minimal depth for that gene across all the trees.\
 We chose to show only the top 15 genes by average minimal depth because a *lower value of average minimal depth tells how important for the model the gene is*. As you can see many of the target genes we discussed before like rpsF, galY, ascB are shown here, but now we have multiple confirmations that these genes can be used as a proxy for the activity of crp.
 
 Now we can look more in detail at the genes interaction of this model to see if they make sense. Firstly we take the top 5 genes by importance considering both their mean minimal depth and the number of trees in which they appear. Then we use this information to get the interaction plot.
@@ -724,26 +770,26 @@ In this plot the interactions are ranked by the number of occurrences, defined b
 
 In conclusion random forest is a very reliable model for genes that have an high number of targets, but it is not as good for regulators that have a lower number of target genes. This because we would have much less options for tree splitting.
 
-# Model Choice 
+# Model Choice
 
 Now we want to summarize the results of our analysis, reporting both RMSE and $R^2$ for each cross-validated model:
 
-| Model                          | $$         
-                                  R^2         
-                                  $$          | $$        
-                                               RMSE       
-                                               $$         |
-|--------------------------------|------------|-----------|
-| Linear Regression              | 0.03536782 | 0.3720215 |
-| Multivariate Linear Regression | 0.09793242 | 9.858278  |
-| Lasso Regression               | 0.7797536  | 0.1752410 |
-| PCR                            | 0.77319657 | 0.1799469 |
-| Decision Tree                  | 0.3108767  | 0.3358151 |
-| Random Forest                  | 0.7294742  | 0.2409751 |
+| Model                          | $$                                                                                                                     
+                                                                                                                                        R^2               
+                                                                                                                                        $$                | $$                                                                                                                                                                                                                                                                       
+                                                                                                                                                                                                                                                                                                                                                                                                                    RMSE             
+                                                                                                                                                                                                                                                                                                                                                                                                                    $$               |
+|------------------------------------|------------------|------------------|
+| Linear Regression              | 0.03536782                                                                                                             | 0.3720215                                                                                                                                                                                                                                                                |
+| Multivariate Linear Regression | 0.09793242                                                                                                             | 9.858278                                                                                                                                                                                                                                                                 |
+| Lasso Regression               | 0.7797536                                                                                                              | 0.1752410                                                                                                                                                                                                                                                                |
+| PCR                            | 0.77319657                                                                                                             | 0.1799469                                                                                                                                                                                                                                                                |
+| Decision Tree                  | 0.3108767                                                                                                              | 0.3358151                                                                                                                                                                                                                                                                |
+| Random Forest                  | 0.7294742                                                                                                              | 0.2409751                                                                                                                                                                                                                                                                |
 
 Simple and multivariate linear regression performed poorly on the data. This was evident from the beginning because the assumptions were not respected. Also Decision Tree performed quite badly, this because a single tree can't achieve the complexity of the data that we are using.
 
-Lasso Regression, PCR and Random Forest show positive results in term of $R^2$ and RMSE. How we can choose between them? PCR lack interpretability since the data are projected in a different space and it seems to overfit the data. Furthermore dimensionality reduction does not make sense in all the cases where the regulators have few targets. \
+Lasso Regression, PCR and Random Forest show positive results in term of $R^2$ and RMSE. How we can choose between them? PCR lack interpretability since the data are projected in a different space and it seems to overfit the data. Furthermore dimensionality reduction does not make sense in all the cases where the regulators have few targets.\
 Random Forest performed quite well, but it isn't generalizable to all the genes. It can be applied only on regulators with enough targets, while most of the genes have few connections.
 
 We can conclude that Lasso Regression is the best model in statistical terms and is very interpretable. In addition it could be applied on all the regulators, since it does not have the limitations seen for the random forest approach.
