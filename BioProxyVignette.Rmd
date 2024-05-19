@@ -45,7 +45,9 @@ library(igraph)
 library(vip)
 library(ggrepel)
 library(rattle)
-library(randomForestExplainer)
+library(randomForestExplainer) 
+library(clusterProfiler)
+library(org.EcK12.eg.db)
 ```
 
 # Pre-processing
@@ -295,6 +297,8 @@ These histograms show how many genes are regulated by how many regulator. The ho
 
 ### Network analysis
 
+Let's
+
 ```{r, fig.width = 12, fig.height = 12}
 # Creating adj matrix to plot the network
 edge_list <- cbind(RegulatorName = regulator$X3.RegulatorGeneName, 
@@ -306,7 +310,79 @@ plot.igraph(graph, layout=layout, vertex.label=NA, vertex.size=3, edge.arrow.siz
 
 ```
 
-+++
+**Centrality Measures:**
+
+-   **Degree:** This indicates the number of connections a gene (node) has within the network. Nodes with high degree are considered hubs and might play a key role in gene regulation.
+
+-   **Betweenness Centrality:** This quantifies the information flow that passes through a node. Nodes with high betweenness centrality act as bridges between gene groups and might be crucial for coordinating gene expression.
+
+-   **Closeness Centrality:** It measures how close a node is, on average, to all other nodes in the network. Nodes with high closeness centrality are positioned centrally and could facilitate communication between different network parts.
+
+So in the next steps we are going to find the top 25 genes for centrality score. Then to have a better idea we are going to perform enrichment analysis over the top 25 gene set for each measure.
+
+```{r}
+# Centrality metrics
+degree_scores <- degree(graph)
+betweenness_scores <- betweenness(graph)
+closeness_scores <- closeness(graph)
+```
+
+```{r}
+# Function to get the top 25 genes for a given measure
+get_top_genes <- function(scores) {
+  sorted_scores <- sort(scores, decreasing = TRUE)
+  top_genes <- head(names(sorted_scores), 25)
+  top_scores <- head(sorted_scores, 25)
+  data.frame(Gene = top_genes, Score = top_scores)
+}
+```
+
+```{r}
+# Get top 10 genes for each measure
+top_degree <- get_top_genes(degree_scores)
+print(top_degree)
+```
+
+Let's analyze the result via GO enrichment analysis:
+
+```{r}
+enrich_results_deg <- enrichGO(top_degree$Gene, keyType = "SYMBOL", OrgDb = "org.EcK12.eg.db")
+dotplot(enrich_results_deg, showCategory=20)
+```
+
+The results suggest that the top 25 genes with the highest degree centrality act as hubs in the regulatory network. These genes are key players in controlling the expression of many other genes, consistent with their roles as transcription factors and DNA-binding proteins.
+
+Now let's analyze the results for betweenness that measures the extent to which a node lies on the shortest paths between other nodes in the network. It indicates how often a node acts as a bridge along the shortest path between two other nodes.
+
+```{r}
+top_betweenness <- get_top_genes(betweenness_scores)
+print(top_betweenness)
+```
+
+As before, we perform enrichment analysis and plot the results:
+
+```{r}
+enrich_results_bet <- enrichGO(top_betweenness$Gene, keyType = "SYMBOL", OrgDb = "org.EcK12.eg.db")
+dotplot(enrich_results_bet, showCategory=20)
+```
+
+High betweenness centrality genes are expected to be pivotal in regulating key processes and facilitating communication within the network. The identified GO terms are consistent with roles in transcriptional regulation, signal transduction, genome maintenance, and cellular response mechanisms. These genes serve as crucial nodes that bridge different parts of the network, controlling the flow of genetic information and ensuring coordinated cellular functions.
+
+Let's repeat the process for the last measure of centrality. Closeness measures how quickly a node can reach all other nodes in the network, suggesting that these genes are well-positioned to influence the entire network efficiently.
+
+```{r}
+top_closeness <- get_top_genes(closeness_scores)
+print(top_closeness)
+```
+
+For the last time we perform enrichment analysis and plot the results:
+
+```{r}
+enrich_results_close <- enrichGO(top_closeness$Gene, keyType = "SYMBOL", OrgDb = "org.EcK12.eg.db")
+dotplot(enrich_results_close, showCategory=20)
+```
+
+The GO terms enriched among the top closeness centrality genes highlight their crucial roles in RNA binding and processing, transcription regulation, and maintaining structural integrity. These genes are well-positioned to influence the network efficiently, ensuring rapid coordination and regulation of essential cellular processes. Their involvement in key functions like protein synthesis, transcription regulation, and structural maintenance underscores their importance in the overall regulatory and functional landscape of the cell.
 
 # Modelling
 
@@ -862,9 +938,8 @@ positive_reg <- positive_reg[!(positive_reg$X3.RegulatorGeneName == positive_reg
 
 ```
 
-```{r}
+```{r warning=FALSE}
 results <- lapply(unique_pos_reg, lasso, exp_matrix=log_tpm, reg_network=positive_reg)
-
 
 ```
 
