@@ -573,10 +573,14 @@ We can confirm that Lasso is a reliable method from both the biological and the 
 
 Principal component analysis (PCA) is a dimensionality reduction technique that aims to capture the most significant variations within the data by transforming it into a new coordinate system with fewer dimensions. Principal component regression (PCR) is a statistical technique that uses PCA for regression analysis. How does PCA works?
 
-![](images/clipboard-4096431045.png){width="332"}
+![](images/clipboard-4096431045.png){width="414"}
+
+<div>
 
 Principal components are new directions (axes) created by PCA in that high-dimensional space.These PCs represent the directions of greatest variance in the data. The first principal component captures the most variance, the second PC captures the remaining largest variance, and so on.\
 First, we need to find the covariance matrix which helps identify directions (principal components) where data points exhibit the most variation.
+
+</div>
 
 $$
 \sum =\begin{bmatrix}
@@ -611,7 +615,7 @@ But there are also some aspects to consider:
 
 -   Issue of interpretability because understanding the biological meaning of the linear combination can be challenging.
 
-We choose this method because crp has 300 target so it is important to reduce the number of variabile, to the ones that are really associated with the response.
+We choose this method because crp has 300 target so it is important to reduce the number of variables, to the ones that are really associated with the response.
 
 ```{r}
 set.seed(123)
@@ -629,7 +633,7 @@ crp_pca <- train(crp ~.,
 crp_pca
 ```
 
-While the model achieves a high $R^2$ value of 0.773 and a low RMSE of 0.179, these metrics suggest that the model is fitting the training data too closely and may not generalize well to unseen data.
+While the model achieves a high $R^2$ value of 0.773 and a low RMSE of 0.179, these metrics suggest that the model is fitting the training data very well.
 
 ```{r, fig.width = 12, fig.height = 5}
 cv_pcr_plot <-  ggplot(data = crp_pca$results, aes(x = ncomp, y = RMSE, group=1)) +
@@ -643,7 +647,7 @@ cv_pcr_plot <-  ggplot(data = crp_pca$results, aes(x = ncomp, y = RMSE, group=1)
 cv_pcr_plot
 ```
 
-The oscillating behavior of the RMSE in the elbow plot for PCR suggests that there might not be a clear "sweet spot" for the number of principal components (PCs) to choose. This could be a sign of overfitting.
+The oscillating behavior of the RMSE in the elbow plot for PCR suggests that there might not be a clear "sweet spot" for the number of principal components (PCs) to choose, leading to the decision of a larger number of PCs. This could be a sign of overfitting.
 
 Here again we report the vip plot.
 
@@ -774,18 +778,18 @@ In conclusion random forest is a very reliable model for genes that have an high
 
 Now we want to summarize the results of our analysis, reporting both RMSE and $R^2$ for each cross-validated model:
 
-| Model                          | $$                                                                                                                     
-                                                                                                                                        R^2               
-                                                                                                                                        $$                | $$                                                                                                                                                                                                                                                                       
-                                                                                                                                                                                                                                                                                                                                                                                                                    RMSE             
-                                                                                                                                                                                                                                                                                                                                                                                                                    $$               |
-|------------------------------------|------------------|------------------|
-| Linear Regression              | 0.03536782                                                                                                             | 0.3720215                                                                                                                                                                                                                                                                |
-| Multivariate Linear Regression | 0.09793242                                                                                                             | 9.858278                                                                                                                                                                                                                                                                 |
-| Lasso Regression               | 0.7797536                                                                                                              | 0.1752410                                                                                                                                                                                                                                                                |
-| PCR                            | 0.77319657                                                                                                             | 0.1799469                                                                                                                                                                                                                                                                |
-| Decision Tree                  | 0.3108767                                                                                                              | 0.3358151                                                                                                                                                                                                                                                                |
-| Random Forest                  | 0.7294742                                                                                                              | 0.2409751                                                                                                                                                                                                                                                                |
+| Model                          | $$                                                                                                                                                                                                                                 
+                                                                                                                                                                                                                                              R^2                     
+                                                                                                                                                                                                                                              $$                      | $$                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             RMSE                   
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             $$                     |
+|----------------------------------|-------------------|-------------------|
+| Linear Regression              | 0.03536782                                                                                                                                                                                                                         | 0.3720215                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Multivariate Linear Regression | 0.09793242                                                                                                                                                                                                                         | 9.858278                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Lasso Regression               | 0.7797536                                                                                                                                                                                                                          | 0.1752410                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| PCR                            | 0.77319657                                                                                                                                                                                                                         | 0.1799469                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Decision Tree                  | 0.3108767                                                                                                                                                                                                                          | 0.3358151                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Random Forest                  | 0.7294742                                                                                                                                                                                                                          | 0.2409751                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 Simple and multivariate linear regression performed poorly on the data. This was evident from the beginning because the assumptions were not respected. Also Decision Tree performed quite badly, this because a single tree can't achieve the complexity of the data that we are using.
 
@@ -798,22 +802,105 @@ We can conclude that Lasso Regression is the best model in statistical terms and
 
 Now we want to apply Lasso Regression to all the regulators to see the overall performance. Then we are going to check if the expressions of the regulators are effectively linked with the expressions of their target. The last step will be to check if some regulators are correlated with the activity of the corresponding kinase.
 
+Now we define a function ...
+
 ```{r}
+lasso <- function(regulator, exp_matrix, reg_network){
+  # Expression of regulator
+  regulator_exp <- exp_matrix[,colnames(exp_matrix) == regulator]
+  
+  # List of positively regulated targets by crp
+  target <- reg_network[reg_network$X3.RegulatorGeneName == regulator,]
+  
+  # Expression of the targets
+  target_exp <- data.frame(exp_matrix[,colnames(exp_matrix) %in% target$X5.regulatedName])
+  colnames(target_exp) <- unique(target$X5.regulatedName)
+  regulator_exp <- data.frame(regulator = regulator_exp)
+  #colnames(regulator_exp) <- regulator
+  regulator_full <- data.frame(cbind(regulator_exp, target_exp))
+  
+  #CV
+  fit_control <- trainControl(
+    method = "repeatedcv",
+    number = 10,
+    ## repeated ten times
+    repeats = 10)
+  
+  #LASSO
+  set.seed(123)
+  # Tuning grid for Lasso 
+  tune_grid_lasso <- expand.grid(alpha = 1, #tell the function to perform lasso
+                                 lambda = c(0, 10^(-5:5))) #values of lambda to try
+  if(ncol(target_exp) == 1 ){
+    reg <- train(regulator ~., 
+                       data = regulator_full,
+                       method = "lm",
+                       preProcess = c("center", "scale"), #this basically transform in Z scores
+                       trControl = fit_control)
+  }
+  else{
+  # Lasso training, cv and hyperparameter tuning
+        reg <- train(regulator ~., 
+                     data = regulator_full,
+                     method = "glmnet",
+                     preProcess = c("center", "scale", "zv"), #this basically transform in Z scores
+                     trControl = fit_control,
+                     tuneGrid = tune_grid_lasso)
+  }
+  return(reg)
+}
+
+```
+
+We need to remove/modify
+
+```{r}
+unique_pos_reg <- unique(positive_reg$X3.RegulatorGeneName) #120
+unique_pos_reg <- unique_pos_reg[unique_pos_reg %in% colnames(log_tpm)] #109
+positive_reg <-positive_reg[positive_reg$X5.regulatedName %in% colnames(log_tpm),] 
+positive_reg <- positive_reg[!(positive_reg$X3.RegulatorGeneName == positive_reg$X5.regulatedName),]
 
 ```
 
 ```{r}
-set.seed(123)
-# Tuning grid for Lasso 
-tune_grid_lasso <- expand.grid(alpha = 1, #tell the function to perform lasso
-                               lambda = 10^(-5:5)) #values of lambda to try
+results <- lapply(unique_pos_reg, lasso, exp_matrix=log_tpm, reg_network=positive_reg)
 
-# Lasso training, cv and hyperparameter tuning
-crp_lasso <- train(crp ~., 
-                   data = crp_full,
-                   method = "glmnet",
-                   preProcess = c("center", "scale"), #this basically transform in Z scores
-                   trControl = fit_control,
-                   tuneGrid = tune_grid_lasso)
-crp_lasso
+
 ```
+
+```{r}
+R2 <- lapply(results, function(x){
+  if(x$method == "lm"){
+    R2 <- x$results$Rsquared
+  }
+  else {
+    R2 <- x$results[x$bestTune$lambda == x$results$lambda,]$Rsquared
+  }
+})
+
+
+our_RMSE <- lapply(results, function(x){
+  if(x$method == "lm"){
+    our_RMSE<- x$results$RMSE
+  }
+  else {
+    our_RMSE <- x$results[x$bestTune$lambda == x$results$lambda,]$RMSE
+  }
+})
+
+box_df <- data.frame(variable = c(rep("R^2", length(R2)), rep("RMSE", length(our_RMSE))), value = c(unlist(R2), unlist(our_RMSE)))
+
+```
+
+```{r}
+ggplot(data = box_df, aes(x = variable, y = value)) + 
+  geom_boxplot(fill = c("skyblue", "lightgreen")) + 
+  theme(legend.position = "none") +
+  xlab("") +
+  ylab("") + 
+  ggtitle("R^2 and RMSE distributions") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+# Conclusions

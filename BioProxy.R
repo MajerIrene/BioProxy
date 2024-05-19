@@ -344,7 +344,7 @@ lasso <- function(regulator, exp_matrix, reg_network){
   # Tuning grid for Lasso 
   tune_grid_lasso <- expand.grid(alpha = 1, #tell the function to perform lasso
                                  lambda = c(0, 10^(-5:5))) #values of lambda to try
-  if(ncol(target_exp) <= 10){
+  if(ncol(target_exp) == 1 ){
     reg <- train(regulator ~., 
                        data = regulator_full,
                        method = "lm",
@@ -356,66 +356,48 @@ lasso <- function(regulator, exp_matrix, reg_network){
         reg <- train(regulator ~., 
                      data = regulator_full,
                      method = "glmnet",
-                     preProcess = c("center", "scale"), #this basically transform in Z scores
+                     preProcess = c("center", "scale", "zv"), #this basically transform in Z scores
                      trControl = fit_control,
                      tuneGrid = tune_grid_lasso)
   }
   return(reg)
 }
 
-unique_pos_reg <- unique(positive_reg$X3.RegulatorGeneName)
-
+unique_pos_reg <- unique(positive_reg$X3.RegulatorGeneName) #120
+unique_pos_reg <- unique_pos_reg[unique_pos_reg %in% colnames(log_tpm)] #109
+positive_reg <-positive_reg[positive_reg$X5.regulatedName %in% colnames(log_tpm),] 
+positive_reg <- positive_reg[!(positive_reg$X3.RegulatorGeneName == positive_reg$X5.regulatedName),]
 
 results <- lapply(unique_pos_reg, lasso, exp_matrix=log_tpm, reg_network=positive_reg)
 
-positive_reg <- positive_reg[!(positive_reg$X3.RegulatorGeneName == positive_reg$X5.regulatedName),]
-
-results <- vector("list", length = length(unique_pos_reg))
-for(i in 1:length(results)){
-    result <- lapply(unique_pos_reg[i], lasso, exp_matrix=log_tpm, reg_network=positive_reg)
-    results[i] <- list(c(name = unique_pos_reg[i], model = result))
-    
-}
-
-
-#LASSO
-set.seed(123)
-# Tuning grid for Lasso 
-tune_grid_lasso <- expand.grid(alpha = 1, #tell the function to perform lasso
-                               lambda = 0) #values of lambda to try
-
-# Lasso training, cv and hyperparameter tuning
-crp_lasso <- train(crp ~., 
-                   data = crp_full,
-                   method = "glmnet",
-                   preProcess = c("center", "scale"), #this basically transform in Z scores
-                   trControl = fit_control,
-                   tuneGrid = tune_grid_lasso)
-crp_lasso
-
-nrow(positive_reg)
-positive_reg <- positive_reg[!(positive_reg$X3.RegulatorGeneName == positive_reg$X5.regulatedName),]
-
-regulator <- unique_pos_reg[3]
-regulator_exp <- log_tpm[,colnames(log_tpm) == regulator]
-target <- positive_reg[positive_reg$X3.RegulatorGeneName == regulator,]
-target_exp <- data.frame(log_tpm[,colnames(log_tpm) %in% target$X5.regulatedName])
-colnames(target_exp) <- target$X5.regulatedName
-
-regulator_exp <- data.frame(regulator = regulator_exp)
-#colnames(regulator_exp) <- regulator
-regulator_full <- data.frame(cbind(regulator_exp, target_exp))
+R2 <- lapply(results, function(x){
+  if(x$method == "lm"){
+    R2 <- x$results$Rsquared
+  }
+  else {
+    R2 <- x$results[x$bestTune$lambda == x$results$lambda,]$Rsquared
+  }
+})
 
 
-prova_lasso <- train(regulator ~., 
-                     data = regulator_full,
-                     method = "lm",
-                     preProcess = c("center", "scale"),
-                     trControl = fit_control,
-                     tuneGrid = tune_grid_lasso)
-prova_lasso
+our_RMSE <- lapply(results, function(x){
+  if(x$method == "lm"){
+    our_RMSE<- x$results$RMSE
+  }
+  else {
+    our_RMSE <- x$results[x$bestTune$lambda == x$results$lambda,]$RMSE
+  }
+})
 
-# togliere geni che non ci sono in log tpm e i geni doppi
+box_df <- data.frame(variable = c(rep("R^2", length(R2)), rep("RMSE", length(our_RMSE))), value = c(unlist(R2), unlist(our_RMSE)))
+
+ggplot(data = box_df, aes(x = variable, y = value)) + 
+  geom_boxplot(fill = c("skyblue", "lightgreen")) + 
+  theme(legend.position = "none") +
+  xlab("") +
+  ylab("") + 
+  ggtitle("R^2 and RMSE distributions") +
+  theme(plot.title = element_text(hjust = 0.5))
 
 
 
