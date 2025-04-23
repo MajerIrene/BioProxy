@@ -1,4 +1,5 @@
-BioProxy
+## BioProxy ##
+
 Escherichia coli is a gram negative bacterium and it is the most studied bacterial model organism for many reasons: its ability to grow fast on cheap media; the fact that it can be genetically manipulated and modified much easier with respect to eukaryotic organisms or even other bacteria. When an organism is as studied as E. coli the amount of data available about it can be massive. For this reason we would like to perform a bioinformatic analysis to extract knowledge from one of the many RNA-seq dataset available for E. coli.
 
 This project aims to establish a proxy for determining the activity of transcription factors based on the expression levels of the genes regulated by those factors. In prokaryotes genes with related functions are encoded together within the same genome block, which is called operon, and they are usually transcribed together in a so called polycistronic transcript, because they are under the control of the same promoter.
