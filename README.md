@@ -1,4 +1,4 @@
-## BioProxy ##
+# BioProxy #
 
 Escherichia coli is a gram negative bacterium and it is the most studied bacterial model organism for many reasons: its ability to grow fast on cheap media; the fact that it can be genetically manipulated and modified much easier with respect to eukaryotic organisms or even other bacteria. When an organism is as studied as E. coli the amount of data available about it can be massive. For this reason we would like to perform a bioinformatic analysis to extract knowledge from one of the many RNA-seq dataset available for E. coli.
 
